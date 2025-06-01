@@ -1,0 +1,21 @@
+# Python生成的文件
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# 其他文件
+.cursorrules
+*.log
+*.sqlite3
+.python-version
+
+# 虚拟环境
+.venv
+
+# vscode、 github配置
+.idea/
+.ruff_cache/
+.mypy_cache/
