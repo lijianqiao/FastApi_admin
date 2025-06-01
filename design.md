@@ -111,23 +111,22 @@ admin_system/
 ## 数据库模型设计
 
 ### 1. 用户模型 (User)
+
 ```python
 字段列表：
-- id: 主键
+- id: UUID (主键)
 - username: 用户名（唯一）
 - email: 邮箱（唯一）
-- password_hash: 密码哈希
+- phone: 手机号（唯一）
+- password: 密码哈希
 - full_name: 全名
 - avatar_url: 头像URL
-- phone: 手机号
-- department: 部门
-- position: 职位
 - is_active: 是否激活
 - is_superuser: 是否超级用户
+- is_deleted: 软删除
 - email_verified: 邮箱是否验证
 - phone_verified: 手机是否验证
 - last_login_at: 最后登录时间
-- last_login_ip: 最后登录IP
 - login_count: 登录次数
 - password_changed_at: 密码修改时间
 - created_at: 创建时间
@@ -143,14 +142,16 @@ admin_system/
 ### 2. 角色模型 (Role)
 ```python
 字段列表：
-- id: 主键
+- id: UUID (主键)
 - name: 角色名称（唯一）
 - code: 角色代码（唯一）
 - description: 描述
 - level: 角色等级
 - is_active: 是否激活
 - is_system: 是否系统角色
+- is_deleted: 软删除
 - sort_order: 排序
+- permissions_cache: 权限缓存（JSON，提升查询性能）
 - created_at: 创建时间
 - updated_at: 更新时间
 - created_by: 创建者
@@ -164,7 +165,7 @@ admin_system/
 ### 3. 权限模型 (Permission)
 ```python
 字段列表：
-- id: 主键
+- id: UUID (主键)
 - name: 权限名称
 - code: 权限代码（唯一）
 - description: 描述
@@ -174,6 +175,7 @@ admin_system/
 - path: API路径
 - category: 权限分类
 - is_system: 是否系统权限
+- is_deleted: 软删除
 - sort_order: 排序
 - created_at: 创建时间
 - updated_at: 更新时间
@@ -205,7 +207,7 @@ admin_system/
 ### 6. 审计日志模型 (AuditLog)
 ```python
 字段列表：
-- id: 主键
+- id: UUID (主键)
 - user_id: 用户ID（外键）
 - username: 用户名（冗余存储）
 - action: 操作类型
@@ -229,7 +231,7 @@ admin_system/
 ### 7. 系统配置模型 (SystemConfig)
 ```python
 字段列表：
-- id: 主键
+- id: UUID (主键)
 - key: 配置键（唯一）
 - value: 配置值（JSON）
 - description: 描述
@@ -237,6 +239,7 @@ admin_system/
 - data_type: 数据类型
 - is_public: 是否公开
 - is_encrypted: 是否加密
+- is_deleted: 软删除
 - validation_rule: 验证规则
 - default_value: 默认值
 - version: 版本号
