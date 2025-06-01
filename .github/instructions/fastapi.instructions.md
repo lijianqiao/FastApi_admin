@@ -6,22 +6,63 @@
 
 
 ```plaintext
-my_project/
-├── app/
-│   ├── api/
-│   ├── core/
-│   ├── models/
-│   ├── services/
-│   ├── repositories/
-│   ├── utils/
-│   ├── db/
-│   └── main.py
-├── tests/
-├── migrations/
-├── scripts/
-├── requirements.txt
-├── .env.example
-└── Dockerfile
+fastapibase/
+├── app/                      # 核心应用代码
+│   ├── api/                  # API 路由层
+│   │   ├── v1/               # 版本控制 (如 v1, v2)
+│   │   │   ├── endpoints/    # 端点模块 (users.py, products.py)
+│   │   │   └── __init__.py
+│   │   └── dependencies.py   # 路由依赖项 (认证、权限等)
+│   │
+│   ├── core/                 # 核心配置
+│   │   ├── __init__.py        
+│   │   ├── config.py         # 应用配置 (环境变量加载)
+│   │   ├── security.py       # 安全模块 (JWT, OAuth2)
+│   │   └── middleware.py     # 自定义中间件
+│   │
+│   ├── models/               # 数据模型层
+│   │   ├── __init__.py  
+│   │   ├── domain/           # 领域/数据库模型 (SQLAlchemy)
+│   │   └── schemas/          # Pydantic 校验模型 (请求/响应)
+│   │
+│   ├── services/             # 业务逻辑层
+│   │   ├── __init__.py  
+│   │   ├── user_service.py   # 业务服务类
+│   │   └── ...               # (解耦业务逻辑与路由)
+│   │
+│   ├── repositories/         # 数据访问层
+│   │   ├── __init__.py  
+│   │   ├── user_repository.py # 数据库操作 (CRUD)
+│   │   └── ...               # (抽象数据库交互)
+│   │
+│   ├── utils/                # 工具类
+│   │   ├── __init__.py  
+│   │   ├── logger.py         # 日志配置
+│   │   └── helpers.py        # 通用工具函数
+│   │
+│   ├── db/                   # 数据库管理
+│   │   ├── __init__.py  
+│   │   ├── session.py        # 数据库会话管理
+│   │   └── base.py           # ORM 基类模型
+│   ├── __init__.py  
+│   └── main.py               # FastAPI 应用入口
+│
+├── tests/                    # 测试目录
+│   ├── __init__.py  
+│   ├── unit/                 # 单元测试
+│   └── integration/          # 集成测试
+│
+├── migrations/               # 数据库迁移脚本 (Alembic)
+├── scripts/                  # 部署/维护脚本
+├── requirements.txt          # 依赖清单
+├── .main.py                # FastAPI 应用入口
+├── pyproject.toml            # 项目配置 (依赖、工具)
+├── alembic.ini               # Alembic 配置文件
+├── README.md                 # 项目说明文档
+├── .env.example              # 环境变量模板
+├── .gitignore                # Git 忽略文件
+├── uv.lock                   # 依赖锁定文件
+└── Dockerfile                # 容器化配置
 ```
 
 ### 1. 项目初始化
