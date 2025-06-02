@@ -6,7 +6,7 @@
 @Docs: 模型初始化模块
 """
 
-from .models import AuditLog, Permission, Role, RolePermission, SystemConfig, User, UserRole
+from .database.models import AuditLog, Permission, Role, RolePermission, SystemConfig, User, UserRole
 
 __all__ = [
     "User",

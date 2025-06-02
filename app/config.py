@@ -7,31 +7,13 @@
 """
 
 import logging
-from enum import Enum
 from functools import lru_cache
 from typing import Any, ClassVar
 
 from pydantic import BaseModel, Field, PostgresDsn, RedisDsn, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
-class Environment(str, Enum):
-    """环境枚举"""
-
-    DEVELOPMENT = "development"  # 开发环境
-    STAGING = "staging"  # 预发布环境
-    PRODUCTION = "production"  # 生产环境
-    TESTING = "testing"  # 测试环境
-
-
-class LogLevel(str, Enum):
-    """日志级别枚举"""
-
-    DEBUG = "DEBUG"
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
-    CRITICAL = "CRITICAL"
+from app.utils.enum import Environment, LogLevel
 
 
 def parse_cors_origins(v: Any) -> list[str]:
