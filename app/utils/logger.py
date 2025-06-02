@@ -101,7 +101,7 @@ class LoggerManager:
             return
 
         self.log_dir = Path(settings.log_directory)
-        self.log_level = settings.log_level
+        self.log_level = settings.log_level.value  # 使用枚举的字符串值
         self.loggers: dict[str, logging.Logger] = {}
 
         # 创建日志目录
