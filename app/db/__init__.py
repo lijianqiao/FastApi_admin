@@ -3,19 +3,10 @@
 @Email: lijianqiao2906@live.com
 @FileName: __init__.py
 @DateTime: 2025/05/29 19:39:42
-@Docs: 数据库模块初始化
+@Docs: 数据库模块初始化 - 简化设计
 """
 
-from app.db.base import (
-    AuditMixin,
-    Base,
-    BigIntAuditModel,
-    BigIntModel,
-    SlugMixin,
-    UniqueMixin,
-    UUIDAuditModel,
-    UUIDModel,
-)
+from app.db.base import AutoIdModel, BaseModel
 from app.db.session import (
     DatabaseManager,
     database_manager,
@@ -26,17 +17,9 @@ from app.db.session import (
 )
 
 __all__ = [
-    "Base",
-    # UUID 基类
-    "UUIDModel",
-    "UUIDAuditModel",
-    # BigInt 基类
-    "BigIntModel",
-    "BigIntAuditModel",
-    # Mixins
-    "AuditMixin",
-    "SlugMixin",
-    "UniqueMixin",
+    # 基础模型
+    "BaseModel",
+    "AutoIdModel",
     # 会话管理
     "get_async_session",
     "get_repository_session",

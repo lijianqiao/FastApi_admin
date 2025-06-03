@@ -3,219 +3,125 @@
 @Email: lijianqiao2906@live.com
 @FileName: __init__.py
 @DateTime: 2025/06/02 02:32:03
-@Docs: Pydantic 模式模块
+@Docs: Pydantic 模式模块 - 现代后台管理系统最优设计
 
-Schemas模块导出，提供简洁的导入路径
-使用方式：
-    from app.models.schemas import UserCreate, UserResponse
-    from app.models.schemas import LoginRequest, LoginResponse
+Schemas模块导出，提供完整的现代后台功能模型
 """
 
-# 从schemas模块导入所有模型类
 from .schemas import (
-    ApiResponse,
-    AuditLogListResponse,
-    # ===================== 审计日志模型 =====================
+    # 基础响应模型
+    APIResponse,
+    # 审计日志模型
+    AuditLogBase,
+    AuditLogCreate,
     AuditLogQuery,
     AuditLogResponse,
-    AuditStatsQuery,
-    AuditStatsResponse,
-    BackupCreate,
-    BackupResponse,
-    # ===================== 数据备份模型 =====================
-    BackupType,
-    # ===================== 基础模型 =====================
+    # 查询相关模型
+    BaseQuery,
     BaseSchema,
-    # ===================== 批量操作模型 =====================
-    BatchOperation,
+    # 批量操作模型
+    BatchDeleteRequest,
     BatchOperationResponse,
-    BatchRoleOperation,
-    BatchUserOperation,
-    # ===================== 统计分析模型 =====================
-    DashboardStats,
-    DictItemBase,
-    DictItemCreate,
-    DictItemResponse,
-    DictItemUpdate,
-    # ===================== 数据字典模型 =====================
-    DictTypeBase,
-    DictTypeCreate,
-    DictTypeResponse,
-    DictTypeUpdate,
-    # ===================== 导入导出模型 =====================
-    ExportQuery,
-    FileListQuery,
-    # ===================== 文件管理模型 =====================
+    BatchUpdateRequest,
+    # 错误处理模型
+    ErrorDetail,
+    # 文件相关模型
     FileUploadResponse,
-    ImportRequest,
-    ImportResponse,
-    # ===================== 认证相关模型 =====================
+    ImportResult,
+    # 认证相关模型
     LoginRequest,
-    LoginResponse,
-    NotificationBase,
-    NotificationCreate,
-    NotificationResponse,
-    # ===================== 消息通知模型 =====================
-    NotificationType,
-    # ===================== 操作日志模型 =====================
-    OperationLogQuery,
-    OperationLogResponse,
-    PageQuery,
-    PageResponse,
-    # ===================== 权限模型 =====================
+    PagedResponse,
+    PaginationResponse,
+    # 权限相关模型
     PermissionBase,
     PermissionCreate,
-    PermissionListQuery,
-    PermissionListResponse,
     PermissionResponse,
     PermissionUpdate,
     RefreshTokenRequest,
-    # ===================== 角色模型 =====================
+    ResponseModel,
+    # 角色相关模型
     RoleBase,
     RoleCreate,
-    RoleDetailResponse,
-    RoleListQuery,
-    RoleListResponse,
-    RolePermissionUpdate,
+    RolePermissionAssignRequest,
+    RoleQuery,
     RoleResponse,
-    RoleStatusUpdate,
     RoleUpdate,
-    # ===================== 系统配置模型 =====================
-    SystemConfigBase,
-    SystemConfigCreate,
-    SystemConfigListResponse,
-    SystemConfigPublicResponse,
-    SystemConfigQuery,
-    SystemConfigResponse,
-    SystemConfigUpdate,
-    # ===================== 系统监控模型 =====================
-    SystemHealthResponse,
-    SystemMetricsResponse,
-    TaskResponse,
-    # ===================== 任务管理模型 =====================
-    TaskStatus,
+    RoleWithPermissions,
+    SearchQuery,
+    # 统计相关模型
+    SystemStats,
     TimestampMixin,
     TokenResponse,
-    # ===================== 用户模型 =====================
+    UserActivityStats,
+    # 用户相关模型
     UserBase,
     UserCreate,
-    UserListQuery,
-    UserListResponse,
-    UserNotificationResponse,
+    UserInfo,
     UserPasswordChange,
+    UserQuery,
     UserResponse,
-    # ===================== 用户角色关联模型 =====================
-    UserRoleAssign,
-    UserRoleListQuery,
-    UserRoleListResponse,
-    UserRoleResponse,
-    UserRoleUpdate,
-    UserStatsQuery,
-    UserStatsResponse,
-    UserStatusUpdate,
+    # 分配相关模型
+    UserRoleAssignRequest,
     UserUpdate,
+    UserWithRoles,
+    ValidationErrorResponse,
 )
 
 __all__ = [
-    # 基础模型
+    # 基础响应模型
+    "APIResponse",
     "BaseSchema",
+    "PagedResponse",
+    "ResponseModel",
+    "PaginationResponse",
     "TimestampMixin",
-    "PageQuery",
-    "PageResponse",
-    "ApiResponse",
-    # 用户模型
+    # 查询相关模型
+    "BaseQuery",
+    "SearchQuery",
+    "UserQuery",
+    "RoleQuery",
+    "AuditLogQuery",
+    # 用户相关模型
     "UserBase",
     "UserCreate",
     "UserUpdate",
     "UserPasswordChange",
-    "UserStatusUpdate",
     "UserResponse",
-    "UserListQuery",
-    "UserListResponse",
-    # 角色模型
+    "UserWithRoles",
+    "UserInfo",
+    # 角色相关模型
     "RoleBase",
     "RoleCreate",
     "RoleUpdate",
-    "RoleStatusUpdate",
     "RoleResponse",
-    "RoleDetailResponse",
-    "RoleListQuery",
-    "RoleListResponse",
-    "RolePermissionUpdate",
-    # 权限模型
+    "RoleWithPermissions",
+    # 权限相关模型
     "PermissionBase",
     "PermissionCreate",
     "PermissionUpdate",
     "PermissionResponse",
-    "PermissionListQuery",
-    "PermissionListResponse",
-    # 用户角色关联模型
-    "UserRoleAssign",
-    "UserRoleUpdate",
-    "UserRoleResponse",
-    "UserRoleListQuery",
-    "UserRoleListResponse",
     # 审计日志模型
-    "AuditLogQuery",
+    "AuditLogBase",
+    "AuditLogCreate",
     "AuditLogResponse",
-    "AuditLogListResponse",
-    # 系统配置模型
-    "SystemConfigBase",
-    "SystemConfigCreate",
-    "SystemConfigUpdate",
-    "SystemConfigResponse",
-    "SystemConfigPublicResponse",
-    "SystemConfigQuery",
-    "SystemConfigListResponse",
     # 认证相关模型
     "LoginRequest",
-    "LoginResponse",
-    "RefreshTokenRequest",
     "TokenResponse",
-    # 统计分析模型
-    "DashboardStats",
-    "UserStatsQuery",
-    "UserStatsResponse",
-    "AuditStatsQuery",
-    "AuditStatsResponse",
-    # 导入导出模型
-    "ExportQuery",
-    "ImportRequest",
-    "ImportResponse",
-    # 任务管理模型
-    "TaskStatus",
-    "TaskResponse",
-    # 文件管理模型
-    "FileUploadResponse",
-    "FileListQuery",
+    "RefreshTokenRequest",
     # 批量操作模型
-    "BatchOperation",
-    "BatchUserOperation",
-    "BatchRoleOperation",
+    "BatchDeleteRequest",
+    "BatchUpdateRequest",
     "BatchOperationResponse",
-    # 数据字典模型
-    "DictTypeBase",
-    "DictTypeCreate",
-    "DictTypeUpdate",
-    "DictTypeResponse",
-    "DictItemBase",
-    "DictItemCreate",
-    "DictItemUpdate",
-    "DictItemResponse",
-    # 系统监控模型
-    "SystemHealthResponse",
-    "SystemMetricsResponse",
-    # 消息通知模型
-    "NotificationType",
-    "NotificationBase",
-    "NotificationCreate",
-    "NotificationResponse",
-    "UserNotificationResponse",
-    # 操作日志模型
-    "OperationLogQuery",
-    "OperationLogResponse",
-    # 数据备份模型
-    "BackupType",
-    "BackupCreate",
-    "BackupResponse",
+    # 分配相关模型
+    "UserRoleAssignRequest",
+    "RolePermissionAssignRequest",
+    # 统计相关模型
+    "SystemStats",
+    "UserActivityStats",
+    # 文件相关模型
+    "FileUploadResponse",
+    "ImportResult",
+    # 错误处理模型
+    "ErrorDetail",
+    "ValidationErrorResponse",
 ]
