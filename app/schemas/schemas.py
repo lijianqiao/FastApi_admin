@@ -18,21 +18,21 @@ T = TypeVar("T")
 
 
 class BaseSchema(BaseModel):
-    """基础Schema配置"""
+    """基础模式类"""
 
     model_config = ConfigDict(
-        validate_assignment=True,
-        use_enum_values=True,
-        extra="ignore",
         from_attributes=True,
+        use_enum_values=True,
+        validate_assignment=True,
+        str_strip_whitespace=True,
     )
 
 
 class TimestampMixin(BaseModel):
-    """时间戳混入"""
+    """时间戳混入类"""
 
-    created_at: datetime | None = Field(None, description="创建时间")
-    updated_at: datetime | None = Field(None, description="更新时间")
+    created_at: datetime = Field(description="创建时间")
+    updated_at: datetime = Field(description="更新时间")
 
 
 class APIResponse(BaseSchema, Generic[T]):
@@ -64,6 +64,7 @@ class BaseQuery(BaseSchema):
     size: int = Field(20, description="每页大小", ge=1, le=100)
     sort_by: str | None = Field(None, description="排序字段")
     sort_desc: bool = Field(False, description="是否降序")
+    include_deleted: bool = Field(False, description="是否包含已删除数据")
 
 
 class SearchQuery(BaseQuery):
@@ -75,7 +76,7 @@ class SearchQuery(BaseQuery):
 class UserQuery(BaseQuery):
     """用户查询模型"""
 
-    keyword: str | None = Field(None, description="搜索关键词（用户名/邮箱/全名）")
+    keyword: str | None = Field(None, description="搜索关键词（用户名/邮箱/昵称/手机号）")
     is_active: bool | None = Field(None, description="是否激活")
     is_superuser: bool | None = Field(None, description="是否超级用户")
 
@@ -93,6 +94,7 @@ class AuditLogQuery(BaseQuery):
     user_id: UUID | None = Field(None, description="用户ID")
     action: str | None = Field(None, description="操作类型")
     resource: str | None = Field(None, description="资源类型")
+    status: str | None = Field(None, description="操作状态")
     start_date: datetime | None = Field(None, description="开始时间")
     end_date: datetime | None = Field(None, description="结束时间")
 
@@ -104,6 +106,7 @@ class BatchDeleteRequest(BaseSchema):
     """批量删除请求模型"""
 
     ids: list[UUID] = Field(..., description="要删除的ID列表", min_length=1)
+    hard_delete: bool = Field(False, description="是否硬删除")
 
 
 class BatchUpdateRequest(BaseSchema):
@@ -122,27 +125,6 @@ class BatchOperationResponse(BaseSchema):
     failed_ids: list[UUID] = Field(default_factory=list, description="失败的ID列表")
 
 
-# ===================== 原有模型保持不变 =====================
-
-
-class ResponseModel(BaseSchema):
-    """通用响应模型（向后兼容）"""
-
-    code: int = Field(200, description="状态码")
-    message: str = Field("操作成功", description="提示信息")
-    data: Any = Field(None, description="数据")
-
-
-class PaginationResponse(BaseSchema):
-    """分页响应模型（向后兼容）"""
-
-    total: int = Field(..., description="总数")
-    page: int = Field(..., description="当前页")
-    size: int = Field(..., description="每页大小")
-    pages: int = Field(..., description="总页数")
-    data: list[Any] = Field(..., description="数据列表")
-
-
 # ===================== 用户相关模型 =====================
 
 
@@ -151,8 +133,28 @@ class UserBase(BaseSchema):
 
     username: str = Field(..., min_length=3, max_length=50, description="用户名")
     email: EmailStr = Field(..., description="邮箱")
-    full_name: str | None = Field(None, max_length=100, description="全名")
+    phone: str | None = Field(None, max_length=20, description="手机号")
+    nickname: str = Field(..., max_length=100, description="昵称")
     is_active: bool = Field(True, description="是否激活")
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        """验证用户名格式"""
+        if not v.replace("_", "").isalnum():
+            raise ValueError("用户名只能包含字母、数字和下划线")
+        return v.lower()
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str | None) -> str | None:
+        """验证手机号格式"""
+        if v is None:
+            return v
+        # 简单的手机号验证
+        if not v.isdigit() or len(v) != 11:
+            raise ValueError("请输入11位手机号")
+        return v
 
 
 class UserCreate(UserBase):
@@ -161,20 +163,24 @@ class UserCreate(UserBase):
     password: str = Field(..., min_length=6, max_length=100, description="密码")
     is_superuser: bool = Field(False, description="是否超级用户")
 
-    @field_validator("username")
-    @classmethod
-    def validate_username(cls, v: str) -> str:
-        """验证用户名格式"""
-        if not v.isalnum():
-            raise ValueError("用户名只能包含字母和数字")
-        return v.lower()
-
 
 class UserUpdate(BaseSchema):
     """更新用户请求模型"""
 
-    full_name: str | None = Field(None, max_length=100, description="全名")
+    email: EmailStr | None = Field(None, description="邮箱")
+    phone: str | None = Field(None, max_length=20, description="手机号")
+    nickname: str | None = Field(None, max_length=100, description="昵称")
     is_active: bool | None = Field(None, description="是否激活")
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str | None) -> str | None:
+        """验证手机号格式"""
+        if v is None:
+            return v
+        if not v.isdigit() or len(v) != 11:
+            raise ValueError("请输入11位手机号")
+        return v
 
 
 class UserPasswordChange(BaseSchema):
@@ -189,6 +195,8 @@ class UserResponse(UserBase, TimestampMixin):
 
     id: UUID = Field(..., description="用户ID")
     is_superuser: bool = Field(..., description="是否超级用户")
+    is_deleted: bool = Field(..., description="是否已删除")
+    last_login: datetime | None = Field(None, description="最后登录时间")
 
 
 class UserWithRoles(UserResponse):
@@ -204,7 +212,7 @@ class RoleBase(BaseSchema):
     """角色基础模型"""
 
     name: str = Field(..., min_length=2, max_length=50, description="角色名称")
-    description: str | None = Field(None, description="角色描述")
+    description: str | None = Field(None, max_length=255, description="角色描述")
     is_active: bool = Field(True, description="是否激活")
 
 
@@ -218,7 +226,7 @@ class RoleUpdate(BaseSchema):
     """更新角色请求模型"""
 
     name: str | None = Field(None, min_length=2, max_length=50, description="角色名称")
-    description: str | None = Field(None, description="角色描述")
+    description: str | None = Field(None, max_length=255, description="角色描述")
     is_active: bool | None = Field(None, description="是否激活")
 
 
@@ -226,6 +234,7 @@ class RoleResponse(RoleBase, TimestampMixin):
     """角色响应模型"""
 
     id: UUID = Field(..., description="角色ID")
+    is_deleted: bool = Field(..., description="是否已删除")
 
 
 class RoleWithPermissions(RoleResponse):
@@ -242,7 +251,9 @@ class PermissionBase(BaseSchema):
 
     name: str = Field(..., min_length=2, max_length=100, description="权限名称")
     code: str = Field(..., min_length=2, max_length=100, description="权限代码")
-    description: str | None = Field(None, description="权限描述")
+    description: str | None = Field(None, max_length=255, description="权限描述")
+    resource: str = Field(..., max_length=100, description="资源名称")
+    action: str = Field(..., max_length=50, description="操作类型")
 
 
 class PermissionCreate(PermissionBase):
@@ -255,13 +266,16 @@ class PermissionUpdate(BaseSchema):
     """更新权限请求模型"""
 
     name: str | None = Field(None, min_length=2, max_length=100, description="权限名称")
-    description: str | None = Field(None, description="权限描述")
+    description: str | None = Field(None, max_length=255, description="权限描述")
+    resource: str | None = Field(None, max_length=100, description="资源名称")
+    action: str | None = Field(None, max_length=50, description="操作类型")
 
 
 class PermissionResponse(PermissionBase, TimestampMixin):
     """权限响应模型"""
 
     id: UUID = Field(..., description="权限ID")
+    is_deleted: bool = Field(..., description="是否已删除")
 
 
 # ===================== 审计日志模型 =====================
@@ -270,17 +284,20 @@ class PermissionResponse(PermissionBase, TimestampMixin):
 class AuditLogBase(BaseSchema):
     """审计日志基础模型"""
 
-    action: str = Field(..., description="操作类型")
-    resource: str = Field(..., description="资源类型")
-    resource_id: str | None = Field(None, description="资源ID")
-    ip_address: str | None = Field(None, description="IP地址")
+    action: str = Field(..., max_length=50, description="操作类型")
+    resource: str | None = Field(None, max_length=100, description="资源类型")
+    resource_id: str | None = Field(None, max_length=100, description="资源ID")
+    status: str = Field(..., max_length=20, description="操作状态")
+    ip_address: str | None = Field(None, max_length=45, description="IP地址")
+    user_agent: str | None = Field(None, max_length=500, description="用户代理")
+    details: str | None = Field(None, description="详细信息")
+    error_message: str | None = Field(None, description="错误信息")
 
 
 class AuditLogCreate(AuditLogBase):
     """创建审计日志请求模型"""
 
     user_id: UUID | None = Field(None, description="用户ID")
-    user_agent: str | None = Field(None, description="用户代理")
 
 
 class AuditLogResponse(AuditLogBase, TimestampMixin):
@@ -288,7 +305,7 @@ class AuditLogResponse(AuditLogBase, TimestampMixin):
 
     id: int = Field(..., description="日志ID")
     user_id: UUID | None = Field(None, description="用户ID")
-    user_agent: str | None = Field(None, description="用户代理")
+    is_deleted: bool = Field(..., description="是否已删除")
 
 
 # ===================== 认证相关模型 =====================
@@ -297,7 +314,7 @@ class AuditLogResponse(AuditLogBase, TimestampMixin):
 class LoginRequest(BaseSchema):
     """登录请求模型"""
 
-    username: str = Field(..., description="用户名或邮箱")
+    username: str = Field(..., description="用户名、邮箱或手机号")
     password: str = Field(..., description="密码")
     remember_me: bool = Field(False, description="记住我")
 
@@ -323,7 +340,8 @@ class UserInfo(BaseSchema):
     id: UUID = Field(..., description="用户ID")
     username: str = Field(..., description="用户名")
     email: str = Field(..., description="邮箱")
-    full_name: str | None = Field(None, description="全名")
+    phone: str | None = Field(None, description="手机号")
+    nickname: str = Field(..., description="昵称")
     is_superuser: bool = Field(..., description="是否超级用户")
     roles: list[str] = Field(default_factory=list, description="角色列表")
     permissions: list[str] = Field(default_factory=list, description="权限列表")
@@ -367,29 +385,6 @@ class UserActivityStats(BaseSchema):
     login_count: int = Field(..., description="登录次数", ge=0)
     last_login: datetime | None = Field(None, description="最后登录时间")
     total_actions: int = Field(..., description="总操作数", ge=0)
-
-
-# ===================== 文件相关模型 =====================
-
-
-class FileUploadResponse(BaseSchema):
-    """文件上传响应模型"""
-
-    filename: str = Field(..., description="文件名")
-    original_filename: str = Field(..., description="原始文件名")
-    file_size: int = Field(..., description="文件大小（字节）", ge=0)
-    file_type: str = Field(..., description="文件类型")
-    file_url: str = Field(..., description="文件访问URL")
-    upload_time: datetime = Field(..., description="上传时间")
-
-
-class ImportResult(BaseSchema):
-    """导入结果模型"""
-
-    total_count: int = Field(..., description="总记录数", ge=0)
-    success_count: int = Field(..., description="成功导入数", ge=0)
-    failed_count: int = Field(..., description="失败记录数", ge=0)
-    errors: list[str] = Field(default_factory=list, description="错误信息列表")
 
 
 # ===================== 错误处理模型 =====================
