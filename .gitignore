@@ -11,6 +11,9 @@ wheels/
 *.log
 *.sqlite3
 .python-version
+*test*
+fix_*
+*.pyc
 
 # 虚拟环境
 .venv
