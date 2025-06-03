@@ -13,6 +13,8 @@ from .base import (
     AutoIdModelT,
     BaseModel,
     BaseRepository,
+    IdType,
+    ModelT,
     UUIDModelT,
 )
 from .repositories import AuditLogRepository, PermissionRepository, RoleRepository, UserRepository
@@ -24,6 +26,8 @@ __all__ = [
     "BaseRepository",
     "AutoIdBaseRepository",
     "UUIDModelT",
+    "ModelT",
+    "IdType",
     "AutoIdModelT",
     "UserRepository",
     "RoleRepository",
