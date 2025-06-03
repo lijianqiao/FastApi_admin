@@ -463,16 +463,46 @@ class AuditLogResponse(BaseSchema, TimestampMixin):
     action: AuditAction = Field(..., description="操作类型")
     resource: str = Field(..., description="资源类型")
     resource_id: str | None = Field(None, description="资源ID")
-    resource_name: str | None = Field(None, description="资源名称")
-    method: str | None = Field(None, description="HTTP方法")
-    path: str | None = Field(None, description="请求路径")
+    resource_name: str | None = Field(None, max_length=200, description="资源名称")
+    method: str | None = Field(None, max_length=10, description="HTTP方法")
+    path: str | None = Field(None, max_length=500, description="请求路径")
     old_values: dict[str, Any] | None = Field(None, description="变更前的值")
     new_values: dict[str, Any] | None = Field(None, description="变更后的值")
-    ip_address: str | None = Field(None, description="IP地址")
+    ip_address: str | None = Field(None, max_length=45, description="IP地址")
     user_agent: str | None = Field(None, description="用户代理")
-    request_id: str | None = Field(None, description="请求ID")
-    session_id: str | None = Field(None, description="会话ID")
+    request_id: str | None = Field(None, max_length=100, description="请求ID")
+    session_id: str | None = Field(None, max_length=100, description="会话ID")
     status: AuditStatus = Field(..., description="操作状态")
+    error_message: str | None = Field(None, description="错误信息")
+    duration: int | None = Field(None, ge=0, description="操作耗时（毫秒）")
+
+
+class AuditLogCreate(BaseSchema):
+    """审计日志创建模型"""
+
+    user_id: UUID | None = Field(None, description="用户ID")
+    username: str | None = Field(None, max_length=50, description="用户名")
+    action: AuditAction = Field(..., description="操作类型")
+    resource: str = Field(..., max_length=100, description="资源类型")
+    resource_id: str | None = Field(None, max_length=100, description="资源ID")
+    resource_name: str | None = Field(None, max_length=200, description="资源名称")
+    method: str | None = Field(None, max_length=10, description="HTTP方法")
+    path: str | None = Field(None, max_length=500, description="请求路径")
+    old_values: dict[str, Any] | None = Field(None, description="变更前的值")
+    new_values: dict[str, Any] | None = Field(None, description="变更后的值")
+    ip_address: str | None = Field(None, max_length=45, description="IP地址")
+    user_agent: str | None = Field(None, description="用户代理")
+    request_id: str | None = Field(None, max_length=100, description="请求ID")
+    session_id: str | None = Field(None, max_length=100, description="会话ID")
+    status: AuditStatus = Field(..., description="操作状态")
+    error_message: str | None = Field(None, description="错误信息")
+    duration: int | None = Field(None, ge=0, description="操作耗时（毫秒）")
+
+
+class AuditLogUpdate(BaseSchema):
+    """审计日志更新模型"""
+
+    status: AuditStatus | None = Field(None, description="操作状态")
     error_message: str | None = Field(None, description="错误信息")
     duration: int | None = Field(None, ge=0, description="操作耗时（毫秒）")
 

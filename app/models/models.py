@@ -25,10 +25,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, UUIDAuditModel
+from app.db.base import BaseModel, BigIntAuditBase
 
 
-class User(UUIDAuditModel):
+class User(BaseModel):
     """
     用户模型
 
@@ -77,7 +77,7 @@ class User(UUIDAuditModel):
         return f"<User(id={self.id}, username={self.username}, email={self.email})>"
 
 
-class Role(UUIDAuditModel):
+class Role(BaseModel):
     """
     角色模型
 
@@ -117,7 +117,7 @@ class Role(UUIDAuditModel):
         return f"<Role(id={self.id}, name={self.name}, code={self.code})>"
 
 
-class Permission(UUIDAuditModel):
+class Permission(BaseModel):
     """
     权限模型
 
@@ -159,7 +159,7 @@ class Permission(UUIDAuditModel):
         return f"<Permission(id={self.id}, code={self.code}, resource={self.resource}, action={self.action})>"
 
 
-class UserRole(Base):
+class UserRole(BigIntAuditBase):
     """
     用户角色关联模型
 
@@ -199,7 +199,7 @@ class UserRole(Base):
         return f"<UserRole(user_id={self.user_id}, role_id={self.role_id})>"
 
 
-class RolePermission(Base):
+class RolePermission(BigIntAuditBase):
     """
     角色权限关联模型
 
@@ -233,7 +233,7 @@ class RolePermission(Base):
         return f"<RolePermission(role_id={self.role_id}, permission_id={self.permission_id})>"
 
 
-class AuditLog(UUIDAuditModel):
+class AuditLog(BigIntAuditBase):
     """
     审计日志模型
 
@@ -294,7 +294,7 @@ class AuditLog(UUIDAuditModel):
         return f"<AuditLog(id={self.id}, action={self.action}, resource={self.resource})>"
 
 
-class SystemConfig(UUIDAuditModel):
+class SystemConfig(BaseModel):
     """
     系统配置模型
 
