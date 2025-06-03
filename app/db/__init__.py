@@ -11,7 +11,6 @@ from app.db.session import (
     DatabaseManager,
     database_manager,
     get_async_session,
-    get_repository_session,
     get_sqlalchemy_config,
     sqlalchemy_config,
 )
@@ -22,7 +21,6 @@ __all__ = [
     "AutoIdModel",
     # 会话管理
     "get_async_session",
-    "get_repository_session",
     "get_sqlalchemy_config",
     "sqlalchemy_config",
     # 数据库管理

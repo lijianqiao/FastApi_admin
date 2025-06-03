@@ -88,23 +88,6 @@ async def get_async_session() -> AsyncGenerator[AsyncSession]:
             await session.close()
 
 
-async def get_repository_session() -> AsyncGenerator[AsyncSession]:
-    """
-    获取仓储模式的数据库会话
-
-    专门用于仓储层的会话管理
-    """
-    async with sqlalchemy_config.get_session() as session:
-        try:
-            yield session
-        except Exception as e:
-            logger.error(f"仓储会话错误: {e}", exc_info=True)
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
-
-
 class DatabaseManager:
     """数据库管理器"""
 
