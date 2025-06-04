@@ -43,6 +43,7 @@ class JWTSettings(BaseModel):
     """JWT配置"""
 
     secret_key: str = Field(min_length=32, description="JWT密钥，至少32位")
+    refresh_secret_key: str = Field(min_length=32, description="JWT刷新令牌密钥，至少32位")
     algorithm: str = Field(default="HS256", description="JWT算法")
     access_token_expire_minutes: int = Field(default=30, ge=5, le=1440, description="访问令牌过期时间(分钟)")
     refresh_token_expire_days: int = Field(default=7, ge=1, le=30, description="刷新令牌过期时间(天)")
@@ -122,6 +123,11 @@ class Settings(BaseSettings):
     jwt_secret_key: str = Field(
         default="your_super_secret_jwt_key_change_me_at_least_32_characters_long", min_length=32, description="JWT密钥"
     )
+    jwt_refresh_secret_key: str = Field(
+        default="your_super_secret_jwt_refresh_key_change_me_at_least_32_characters_long",
+        min_length=32,
+        description="JWT刷新令牌密钥",
+    )
     jwt_algorithm: str = Field(default="HS256", description="JWT算法")
     jwt_access_token_expire_minutes: int = Field(default=30, ge=5, le=1440, description="访问令牌过期时间(分钟)")
     jwt_refresh_token_expire_days: int = Field(default=7, ge=1, le=30, description="刷新令牌过期时间(天)")
@@ -186,6 +192,7 @@ class Settings(BaseSettings):
         """获取JWT配置"""
         return JWTSettings(
             secret_key=self.jwt_secret_key,
+            refresh_secret_key=self.jwt_refresh_secret_key,
             algorithm=self.jwt_algorithm,
             access_token_expire_minutes=self.jwt_access_token_expire_minutes,
             refresh_token_expire_days=self.jwt_refresh_token_expire_days,

@@ -17,6 +17,7 @@ from fastapi import HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.exceptions import database_exception_handler
 from app.repositories import AbstractBaseRepository, IdType, ModelT
 from app.schemas.schemas import BaseQuery, PagedResponse
 from app.utils.logger import get_logger
@@ -105,7 +106,7 @@ class AppBaseService(Generic[ModelT, IdType], ABC):
         return record
 
     async def update_record_svc(
-            self, item_id: IdType, data: BaseModel | dict[str, Any], commit: bool = True
+        self, item_id: IdType, data: BaseModel | dict[str, Any], commit: bool = True
     ) -> ModelT | None:
         """
         更新指定ID的记录。
@@ -182,10 +183,10 @@ class AppBaseService(Generic[ModelT, IdType], ABC):
     # ==================== 分页和查询 ====================
 
     async def list_records_paginated(
-            self,
-            pagination: BaseQuery,
-            *filters: FilterTypes,
-            include_deleted: bool = False,
+        self,
+        pagination: BaseQuery,
+        *filters: FilterTypes,
+        include_deleted: bool = False,
     ) -> PagedResponse[ModelT]:
         """
         分页获取记录列表 - 支持Repository的FilterTypes。
@@ -218,10 +219,10 @@ class AppBaseService(Generic[ModelT, IdType], ABC):
         )
 
     async def list_records_paginated_dict(
-            self,
-            pagination: BaseQuery,
-            filters: dict[str, Any] | None = None,
-            include_deleted: bool = False,
+        self,
+        pagination: BaseQuery,
+        filters: dict[str, Any] | None = None,
+        include_deleted: bool = False,
     ) -> PagedResponse[ModelT]:
         """
         分页获取记录列表 - 支持字典过滤器（为向后兼容保留）。
@@ -257,7 +258,7 @@ class AppBaseService(Generic[ModelT, IdType], ABC):
         )
 
     async def list_all_records_svc(
-            self, *filters: FilterTypes, include_deleted: bool = False, auto_expunge: bool = True
+        self, *filters: FilterTypes, include_deleted: bool = False, auto_expunge: bool = True
     ) -> Sequence[ModelT]:
         """
         获取所有符合条件的记录。
@@ -340,13 +341,9 @@ class AppBaseService(Generic[ModelT, IdType], ABC):
         """
         self.logger.error(f"数据库操作失败 [{operation}]: {e}")
 
-        # 可以根据具体异常类型转换为更友好的业务异常
-        if "duplicate key" in str(e).lower():
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="资源已存在")
-        elif "constraint" in str(e).lower():
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="数据约束违反")
-        else:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="服务器内部错误")
+        # 使用统一的异常转换器
+        business_exception = database_exception_handler(e, operation)
+        raise business_exception
 
     # ==================== 数据校验钩子（子类可重写） ====================
 
@@ -407,7 +404,7 @@ class AppBaseService(Generic[ModelT, IdType], ABC):
         return filters
 
     def _build_filter_conditions(self, filters: dict[str, Any]) -> list[FilterTypes]:
-        """ 构建SQLAlchemy的过滤条件。"""
+        """构建SQLAlchemy的过滤条件。"""
         conditions = []
         for key, value in filters.items():
             if hasattr(self.repository.model_type, key):
