@@ -25,6 +25,7 @@ class BaseSchema(BaseModel):
         use_enum_values=True,
         validate_assignment=True,
         str_strip_whitespace=True,
+        arbitrary_types_allowed=True,
     )
 
 
@@ -243,6 +244,18 @@ class RoleWithPermissions(RoleResponse):
     permissions: list["PermissionResponse"] = Field(default_factory=list, description="角色权限")
 
 
+class RoleWithUsers(RoleResponse):
+    """带用户的角色响应模型"""
+
+    users: list["UserResponse"] = Field(default_factory=list, description="角色用户")
+
+
+class RoleWithPermission(RoleResponse):
+    """带权限的角色响应模型"""
+
+    permissions: list[UUID] = Field(default_factory=list, description="角色权限ID列表")
+
+
 # ===================== 权限相关模型 =====================
 
 
@@ -276,6 +289,12 @@ class PermissionResponse(PermissionBase, TimestampMixin):
 
     id: UUID = Field(..., description="权限ID")
     is_deleted: bool = Field(..., description="是否已删除")
+
+
+class PermissionWithRoles(PermissionResponse):
+    """带角色的权限响应模型"""
+
+    roles: list[UUID] = Field(default_factory=list, description="权限关联的角色ID列表")
 
 
 # ===================== 审计日志模型 =====================
@@ -332,6 +351,20 @@ class RefreshTokenRequest(BaseSchema):
     """刷新令牌请求模型"""
 
     refresh_token: str = Field(..., description="刷新令牌")
+
+
+class LogoutRequest(BaseSchema):
+    """登出请求模型"""
+
+    access_token: str = Field(..., description="访问令牌")
+    all_devices: bool = Field(False, description="是否登出所有设备")
+
+
+class LogoutResponse(BaseSchema):
+    """登出响应模型"""
+
+    message: str = Field("登出成功", description="响应消息")
+    success: bool = Field(True, description="是否成功")
 
 
 class UserInfo(BaseSchema):
@@ -410,3 +443,4 @@ class ValidationErrorResponse(BaseSchema):
 # 解决前向引用
 UserWithRoles.model_rebuild()
 RoleWithPermissions.model_rebuild()
+RoleWithUsers.model_rebuild()

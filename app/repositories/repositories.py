@@ -49,7 +49,9 @@ class UserRepository(BaseRepository[User]):
     async def check_username_exists(self, username: str, user_id_to_exclude: UUID | None = None) -> bool:
         """检查用户名是否存在（用于唯一性验证），可排除特定用户ID。"""
         existing_user = await self.get_one_by_field(
-            field_name="username", value=username, include_deleted=False  # 检查未删除的
+            field_name="username",
+            value=username,
+            include_deleted=False,  # 检查未删除的
         )
         if not existing_user:
             return False  # 用户名不存在，可用
@@ -60,7 +62,9 @@ class UserRepository(BaseRepository[User]):
     async def check_email_exists(self, email: str, user_id_to_exclude: UUID | None = None) -> bool:
         """检查邮箱是否存在（用于唯一性验证），可排除特定用户ID。"""
         existing_user = await self.get_one_by_field(
-            field_name="email", value=email, include_deleted=False  # 检查未删除的
+            field_name="email",
+            value=email,
+            include_deleted=False,  # 检查未删除的
         )
         if not existing_user:
             return False
@@ -69,14 +73,14 @@ class UserRepository(BaseRepository[User]):
         return True
 
     async def search_users(
-            self,
-            keyword: str | None = None,
-            is_active: bool | None = None,
-            page: int = 1,
-            page_size: int = 20,
-            sort_by: str = "created_at",
-            sort_desc: bool = True,
-            include_deleted: bool = False,
+        self,
+        keyword: str | None = None,
+        is_active: bool | None = None,
+        page: int = 1,
+        page_size: int = 20,
+        sort_by: str = "created_at",
+        sort_desc: bool = True,
+        include_deleted: bool = False,
     ) -> tuple[Sequence[User], int]:
         """搜索用户，支持关键词（用户名、邮箱、昵称、手机号）和激活状态筛选。"""
         filters: list[FilterTypes] = []
@@ -98,7 +102,7 @@ class UserRepository(BaseRepository[User]):
         return users, total_count
 
     async def get_active_users(
-            self, page: int = 1, page_size: int = 20, sort_by: str = "created_at", sort_desc: bool = True
+        self, page: int = 1, page_size: int = 20, sort_by: str = "created_at", sort_desc: bool = True
     ) -> tuple[Sequence[User], int]:
         """获取活跃用户列表。"""
         active_filter = CollectionFilter(field_name="is_active", values=[True])
@@ -137,9 +141,7 @@ class RoleRepository(BaseRepository[Role]):
 
     async def check_role_name_exists(self, name: str, role_id_to_exclude: UUID | None = None) -> bool:
         """检查角色名是否存在（用于唯一性验证），可排除特定角色ID。"""
-        existing_role = await self.get_one_by_field(
-            field_name="name", value=name, include_deleted=False
-        )
+        existing_role = await self.get_one_by_field(field_name="name", value=name, include_deleted=False)
         if not existing_role:
             return False
         if role_id_to_exclude and existing_role.id == role_id_to_exclude:
@@ -154,20 +156,21 @@ class RoleRepository(BaseRepository[Role]):
         return await self.get_all_records(id_filter, include_deleted=include_deleted)
 
     async def search_roles(
-            self,
-            keyword: str | None = None,
-            is_active: bool | None = None,
-            page: int = 1,
-            page_size: int = 20,
-            sort_by: str = "created_at",
-            sort_desc: bool = True,
-            include_deleted: bool = False,
+        self,
+        keyword: str | None = None,
+        is_active: bool | None = None,
+        page: int = 1,
+        page_size: int = 20,
+        sort_by: str = "created_at",
+        sort_desc: bool = True,
+        include_deleted: bool = False,
     ) -> tuple[Sequence[Role], int]:
         """搜索角色，支持关键词（名称、描述）和激活状态筛选。"""
         filters: list[FilterTypes] = []
         if keyword:
-            filters.append(SearchFilter(field_name={"name", "description"}, value=keyword,
-                                        ignore_case=True))  # 修正: 使用 field_name 并传入 set
+            filters.append(
+                SearchFilter(field_name={"name", "description"}, value=keyword, ignore_case=True)
+            )  # 修正: 使用 field_name 并传入 set
         if is_active is not None:
             filters.append(CollectionFilter(field_name="is_active", values=[is_active]))
 
@@ -179,6 +182,21 @@ class RoleRepository(BaseRepository[Role]):
 
         roles = await self.get_all_records(*filters, include_deleted=include_deleted)
         return roles, total_count
+
+    async def get_roles_by_permission_id(self, permission_id: UUID, include_deleted: bool = False) -> Sequence[Role]:
+        """根据权限ID获取相关角色。"""
+        # 通过查询角色表并过滤关联的权限来实现
+        # 这里使用简化的方法，实际应该通过join查询role_permissions表
+        all_roles = await self.get_all_records(include_deleted=include_deleted)
+        result_roles = []
+
+        for role in all_roles:
+            # 检查角色是否包含指定权限
+            permission_ids = [perm.id for perm in role.permissions]
+            if permission_id in permission_ids:
+                result_roles.append(role)
+
+        return result_roles
 
 
 # --- 权限仓库 (PermissionRepository) ---
@@ -193,9 +211,7 @@ class PermissionRepository(BaseRepository[Permission]):
 
     async def check_permission_code_exists(self, code: str, permission_id_to_exclude: UUID | None = None) -> bool:
         """检查权限代码是否存在（用于唯一性验证），可排除特定权限ID。"""
-        existing_permission = await self.get_one_by_field(
-            field_name="code", value=code, include_deleted=False
-        )
+        existing_permission = await self.get_one_by_field(field_name="code", value=code, include_deleted=False)
         if not existing_permission:
             return False
         if permission_id_to_exclude and existing_permission.id == permission_id_to_exclude:
@@ -203,7 +219,7 @@ class PermissionRepository(BaseRepository[Permission]):
         return True
 
     async def get_permissions_by_ids(
-            self, permission_ids: list[UUID], include_deleted: bool = False
+        self, permission_ids: list[UUID], include_deleted: bool = False
     ) -> Sequence[Permission]:
         """根据一组ID获取多个权限。"""
         if not permission_ids:
@@ -219,7 +235,7 @@ class PermissionRepository(BaseRepository[Permission]):
         return await self.get_all_records(code_filter, include_deleted=include_deleted)
 
     async def get_by_resource_and_action(
-            self, resource: str, action: str, include_deleted: bool = False, auto_expunge: bool = True
+        self, resource: str, action: str, include_deleted: bool = False, auto_expunge: bool = True
     ) -> Permission | None:
         """根据资源和操作获取权限。"""
         business_filters: list[FilterTypes] = [
@@ -239,7 +255,7 @@ class AuditLogRepository(AutoIdBaseRepository[AuditLog]):
     model_type = AuditLog
 
     async def get_by_user_id(
-            self, user_id: UUID, include_deleted: bool = False, limit: int = 50, offset: int = 0
+        self, user_id: UUID, include_deleted: bool = False, limit: int = 50, offset: int = 0
     ) -> Sequence[AuditLog]:
         """根据用户ID获取审计日志列表。"""
         additional_filters: list[FilterTypes] = [
@@ -251,18 +267,18 @@ class AuditLogRepository(AutoIdBaseRepository[AuditLog]):
         )
 
     async def query_logs_with_filters(
-            self,
-            user_id: UUID | None = None,
-            action: str | None = None,
-            resource_name: str | None = None,
-            status: str | None = None,
-            start_date: datetime | None = None,
-            end_date: datetime | None = None,
-            page: int = 1,
-            page_size: int = 20,
-            sort_by: str | None = "created_at",
-            sort_desc: bool = True,
-            include_deleted: bool = False,
+        self,
+        user_id: UUID | None = None,
+        action: str | None = None,
+        resource_name: str | None = None,
+        status: str | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        page: int = 1,
+        page_size: int = 20,
+        sort_by: str | None = "created_at",
+        sort_desc: bool = True,
+        include_deleted: bool = False,
     ) -> tuple[Sequence[AuditLog], int]:
         """根据提供的查询参数筛选审计日志。"""
         filters: list[FilterTypes] = []
@@ -283,9 +299,8 @@ class AuditLogRepository(AutoIdBaseRepository[AuditLog]):
         current_offset = (page - 1) * page_size
         filters.append(LimitOffset(limit=page_size, offset=current_offset))
 
-        filters.append(OrderBy(
-            field_name=sort_by if sort_by else "created_at",
-            sort_order="desc" if sort_desc else "asc")
+        filters.append(
+            OrderBy(field_name=sort_by if sort_by else "created_at", sort_order="desc" if sort_desc else "asc")
         )
 
         logs = await self.get_all_records(*filters, include_deleted=include_deleted)
