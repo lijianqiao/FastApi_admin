@@ -181,7 +181,6 @@ def decode_access_token(token: str) -> dict[str, Any]:
         raise TokenExpiredError("访问令牌") from e
     except JWTError as e:
         raise InvalidTokenError("访问令牌") from e
-        raise InvalidTokenError("访问令牌") from e
 
 
 def generate_token_pair(user_data: dict[str, Any]) -> dict[str, str]:
