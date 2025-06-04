@@ -22,3 +22,4 @@ fix_*
 .idea/
 .ruff_cache/
 .mypy_cache/
+examples/
