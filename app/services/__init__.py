@@ -6,6 +6,7 @@
 @Docs: 服务层模块导出
 """
 
+from app.services.audit_service import AuditLogService
 from app.services.auth_service import AuthService
 from app.services.base import AppBaseService
 from app.services.permission_service import PermissionService
@@ -13,6 +14,7 @@ from app.services.role_service import RoleService
 from app.services.user_service import UserService
 
 __all__ = [
+    "AuditLogService",
     "AuthService",
     "UserService",
     "PermissionService",
