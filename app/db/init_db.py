@@ -20,9 +20,13 @@ logger = get_logger(__name__)
 
 
 class DatabaseInitializer:
-    """数据库初始化器"""
+    """数据库初始化器
+
+    提供数据库清空、权限初始化、角色初始化、超级管理员初始化等功能
+    """
 
     def __init__(self):
+        """初始化数据库初始化器"""
         self.default_permissions = [
             # 用户管理权限
             {
@@ -212,7 +216,14 @@ class DatabaseInitializer:
         }
 
     async def clear_database(self, session: AsyncSession) -> None:
-        """清空数据库所有数据"""
+        """清空数据库所有数据
+
+        Args:
+            session: 异步数据库会话
+
+        Raises:
+            Exception: 清空失败时抛出
+        """
         logger.info("开始清空数据库...")
 
         try:
@@ -242,7 +253,14 @@ class DatabaseInitializer:
             raise
 
     async def init_permissions(self, session: AsyncSession) -> dict[str, Permission]:
-        """初始化权限"""
+        """初始化权限
+
+        Args:
+            session: 异步数据库会话
+
+        Returns:
+            权限code到Permission对象的映射
+        """
         logger.info("开始初始化权限...")
 
         permission_map = {}
@@ -271,7 +289,15 @@ class DatabaseInitializer:
         return permission_map
 
     async def init_roles(self, session: AsyncSession, permission_map: dict[str, Permission]) -> dict[str, Role]:
-        """初始化角色"""
+        """初始化角色
+
+        Args:
+            session: 异步数据库会话
+            permission_map: 权限映射
+
+        Returns:
+            角色名到Role对象的映射
+        """
         logger.info("开始初始化角色...")
 
         role_map = {}
@@ -304,7 +330,15 @@ class DatabaseInitializer:
         return role_map
 
     async def init_admin_user(self, session: AsyncSession, role_map: dict[str, Role]) -> User:
-        """初始化超级管理员用户"""
+        """初始化超级管理员用户
+
+        Args:
+            session: 异步数据库会话
+            role_map: 角色映射
+
+        Returns:
+            创建或已存在的超级管理员用户对象
+        """
         logger.info("开始初始化超级管理员...")
 
         # 检查管理员是否已存在
@@ -341,7 +375,14 @@ class DatabaseInitializer:
         return admin_user
 
     async def initialize_database(self, clear_first: bool = False) -> None:
-        """执行完整的数据库初始化"""
+        """执行完整的数据库初始化
+
+        Args:
+            clear_first: 是否先清空数据库
+
+        Raises:
+            Exception: 初始化失败时抛出
+        """
         logger.info("开始数据库初始化...")
 
         # 直接创建异步引擎和会话
@@ -381,24 +422,36 @@ class DatabaseInitializer:
                 await engine.dispose()
 
     async def reset_database(self) -> None:
-        """重置数据库（清空并重新初始化）"""
+        """重置数据库（清空并重新初始化）
+
+        Raises:
+            Exception: 重置失败时抛出
+        """
         logger.info("开始重置数据库...")
         await self.initialize_database(clear_first=True)
         logger.info("数据库重置完成！")
 
 
 async def init_database():
-    """数据库初始化入口函数"""
+    """数据库初始化入口函数
+
+    调用 DatabaseInitializer 完成初始化
+    """
     initializer = DatabaseInitializer()
     await initializer.initialize_database()
 
 
 async def reset_database():
-    """数据库重置入口函数"""
+    """数据库重置入口函数
+
+    调用 DatabaseInitializer 完成重置
+    """
     initializer = DatabaseInitializer()
     await initializer.reset_database()
 
 
 if __name__ == "__main__":
     # 直接运行此文件进行数据库初始化
+    import asyncio
+
     asyncio.run(init_database())

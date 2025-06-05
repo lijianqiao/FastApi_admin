@@ -1,6 +1,9 @@
 """
-Permission Service - 权限服务层
-提供权限管理的业务逻辑
+@Author: li
+@Email: lijianqiao2906@live.com
+@FileName: permission_service.py
+@DateTime: 2025/06/05 14:09:24
+@Docs: 提供权限相关的业务逻辑处理，包括权限创建、更新、删除、角色分配等。
 """
 
 from uuid import UUID

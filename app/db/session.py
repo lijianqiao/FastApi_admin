@@ -20,7 +20,14 @@ logger = get_logger(__name__)
 
 
 def create_sqlalchemy_config() -> SQLAlchemyAsyncConfig:
-    """创建 SQLAlchemy 配置"""
+    """创建 SQLAlchemy 配置
+
+    Returns:
+        SQLAlchemyAsyncConfig: SQLAlchemy 异步配置对象
+
+    Raises:
+        Exception: 创建配置失败时抛出
+    """
     try:
         # 创建异步引擎
         engine = create_async_engine(
@@ -63,7 +70,11 @@ def create_sqlalchemy_config() -> SQLAlchemyAsyncConfig:
 
 @lru_cache
 def get_sqlalchemy_config() -> SQLAlchemyAsyncConfig:
-    """获取 SQLAlchemy 配置的单例实例"""
+    """获取 SQLAlchemy 配置的单例实例
+
+    Returns:
+        SQLAlchemyAsyncConfig: 单例 SQLAlchemy 配置
+    """
     return create_sqlalchemy_config()
 
 
@@ -72,10 +83,15 @@ sqlalchemy_config = get_sqlalchemy_config()
 
 
 async def get_async_session() -> AsyncGenerator[AsyncSession]:
-    """
-    获取异步数据库会话的依赖注入函数
+    """获取异步数据库会话的依赖注入函数
 
     用于 FastAPI 的 Depends() 依赖注入
+
+    Yields:
+        AsyncSession: 异步数据库会话
+
+    Raises:
+        Exception: 会话错误时抛出
     """
     async with sqlalchemy_config.get_session() as session:
         try:
@@ -89,14 +105,26 @@ async def get_async_session() -> AsyncGenerator[AsyncSession]:
 
 
 class DatabaseManager:
-    """数据库管理器"""
+    """数据库管理器
+
+    提供数据库表的创建、删除、连接检查等管理功能
+    """
 
     def __init__(self, config: SQLAlchemyAsyncConfig):
+        """初始化数据库管理器
+
+        Args:
+            config: SQLAlchemy 配置对象
+        """
         self.config = config
         self._engine = config.get_engine()
 
     async def create_all_tables(self) -> None:
-        """创建所有表"""
+        """创建所有表
+
+        Raises:
+            Exception: 创建表失败时抛出
+        """
         try:
             # 导入所有模型以确保它们被注册
             from app.db.base import BaseModel  # noqa: F401
@@ -109,7 +137,12 @@ class DatabaseManager:
             raise
 
     async def drop_all_tables(self) -> None:
-        """删除所有表 (仅用于测试环境)"""
+        """删除所有表 (仅用于测试环境)
+
+        Raises:
+            ValueError: 生产环境禁止删除所有表
+            Exception: 删除表失败时抛出
+        """
         if settings.is_production:
             raise ValueError("生产环境禁止删除所有表")
 
@@ -124,7 +157,11 @@ class DatabaseManager:
             raise
 
     async def check_connection(self) -> bool:
-        """检查数据库连接"""
+        """检查数据库连接
+
+        Returns:
+            bool: 连接成功返回True，否则False
+        """
         try:
             async with self.config.get_session() as session:
                 await session.execute(text("SELECT 1"))
@@ -135,7 +172,11 @@ class DatabaseManager:
             return False
 
     async def close(self) -> None:
-        """关闭数据库连接"""
+        """关闭数据库连接
+
+        Raises:
+            Exception: 关闭失败时抛出
+        """
         try:
             await self._engine.dispose()
             logger.info("数据库连接已关闭")

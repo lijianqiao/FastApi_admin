@@ -3,7 +3,9 @@
 @Email: lijianqiao2906@live.com
 @FileName: role_service.py
 @DateTime: 2025/06/04
-@Docs: 角色服务 - 处理角色CRUD操作、权限分配等业务逻辑
+@Docs: 角色服务层
+
+提供角色相关的业务逻辑处理，包括角色创建、更新、删除、权限分配等。
 """
 
 from collections.abc import Sequence

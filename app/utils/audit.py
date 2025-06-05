@@ -3,7 +3,9 @@
 @Email: lijianqiao2906@live.com
 @FileName: audit_improved.py
 @DateTime: 2025/06/03
-@Docs: 审计日志装饰器 - 自动记录操作日志，支持事务一致性和异步记录
+@Docs: 审计日志装饰器
+
+提供审计日志装饰器、日志记录、ID提取等通用工具，支持事务一致性和异步记录。
 """
 
 import asyncio
@@ -21,10 +23,10 @@ logger = get_logger(__name__)
 
 
 def audit_log(
-        action: str,
-        resource: str,
-        get_resource_id: Callable[[Any], str] | None = None,
-        use_same_session: bool = True,
+    action: str,
+    resource: str,
+    get_resource_id: Callable[[Any], str] | None = None,
+    use_same_session: bool = True,
 ):
     """
     改进版审计日志装饰器
@@ -129,15 +131,15 @@ def _extract_session(args: tuple, kwargs: dict) -> AsyncSession | None:
 
 
 async def _create_audit_log_sync(
-        session: AsyncSession,
-        args: tuple,
-        kwargs: dict,
-        result: Any,
-        action: str,
-        resource: str,
-        status: str,
-        error_message: str | None,
-        get_resource_id: Callable[[Any], str] | None,
+    session: AsyncSession,
+    args: tuple,
+    kwargs: dict,
+    result: Any,
+    action: str,
+    resource: str,
+    status: str,
+    error_message: str | None,
+    get_resource_id: Callable[[Any], str] | None,
 ):
     """在同一事务中同步创建审计日志"""
     try:
@@ -196,14 +198,14 @@ async def _create_audit_log_sync(
 
 
 async def _create_audit_log_async(
-        args: tuple,
-        kwargs: dict,
-        result: Any,
-        action: str,
-        resource: str,
-        status: str,
-        error_message: str | None,
-        get_resource_id: Callable[[Any], str] | None,
+    args: tuple,
+    kwargs: dict,
+    result: Any,
+    action: str,
+    resource: str,
+    status: str,
+    error_message: str | None,
+    get_resource_id: Callable[[Any], str] | None,
 ):
     """异步创建审计日志（使用新的数据库连接）"""
     from app.db.session import sqlalchemy_config

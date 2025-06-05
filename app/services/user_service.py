@@ -4,6 +4,10 @@
 @FileName: user_service.py
 @DateTime: 2025/06/04 14:30:00
 @Docs: 用户服务 - 处理用户CRUD操作、资料管理等业务逻辑
+
+用户服务层
+
+提供用户相关的业务逻辑处理，包括用户注册、信息更新、密码修改、角色分配等。
 """
 
 from collections.abc import Sequence

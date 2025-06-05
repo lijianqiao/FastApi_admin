@@ -331,7 +331,13 @@ class AuditLogResponse(AuditLogBase, TimestampMixin):
 
 
 class LoginRequest(BaseSchema):
-    """登录请求模型"""
+    """
+    登录请求模型
+
+    Attributes:
+        username: 用户名
+        password: 密码
+    """
 
     identifier: str = Field(..., description="用户名、邮箱或手机号")
     password: str = Field(..., description="密码")
@@ -339,7 +345,14 @@ class LoginRequest(BaseSchema):
 
 
 class TokenResponse(BaseSchema):
-    """Token响应模型"""
+    """
+    Token响应模型
+
+    Attributes:
+        access_token: 访问令牌
+        token_type: 令牌类型
+        expires_in: 过期时间（秒）
+    """
 
     access_token: str = Field(..., description="访问令牌")
     token_type: str = Field("bearer", description="令牌类型")
@@ -348,27 +361,53 @@ class TokenResponse(BaseSchema):
 
 
 class RefreshTokenRequest(BaseSchema):
-    """刷新令牌请求模型"""
+    """
+    刷新Token请求模型
+
+    Attributes:
+        refresh_token: 刷新令牌
+    """
 
     refresh_token: str = Field(..., description="刷新令牌")
 
 
 class LogoutRequest(BaseSchema):
-    """登出请求模型"""
+    """
+    注销请求模型
+
+    Attributes:
+        refresh_token: 刷新令牌
+    """
 
     access_token: str = Field(..., description="访问令牌")
     all_devices: bool = Field(False, description="是否登出所有设备")
 
 
 class LogoutResponse(BaseSchema):
-    """登出响应模型"""
+    """
+    注销响应模型
+
+    Attributes:
+        success: 是否注销成功
+    """
 
     message: str = Field("登出成功", description="响应消息")
     success: bool = Field(True, description="是否成功")
 
 
 class UserInfo(BaseSchema):
-    """用户信息模型"""
+    """
+    用户信息模型
+
+    Attributes:
+        id: 用户ID
+        username: 用户名
+        email: 邮箱
+        nickname: 昵称
+        is_active: 是否激活
+        is_superuser: 是否超级用户
+        roles: 角色列表
+    """
 
     id: UUID = Field(..., description="用户ID")
     username: str = Field(..., description="用户名")
@@ -382,29 +421,43 @@ class UserInfo(BaseSchema):
 
 
 class LoginResponse(TokenResponse):
-    """登录响应模型"""
+    """
+    登录响应模型
+    """
 
     user: UserInfo = Field(..., description="用户信息")
 
 
 class RefreshTokenResponse(TokenResponse):
-    """刷新令牌响应模型"""
-
-    pass
+    """
+    刷新Token响应模型
+    """
 
 
 # ===================== 角色权限分配模型 =====================
 
 
 class UserRoleAssignRequest(BaseSchema):
-    """用户角色分配请求模型"""
+    """
+    用户角色分配请求模型
+
+    Attributes:
+        user_id: 用户ID
+        role_ids: 角色ID列表
+    """
 
     user_id: UUID = Field(..., description="用户ID")
     role_ids: list[UUID] = Field(..., description="角色ID列表")
 
 
 class RolePermissionAssignRequest(BaseSchema):
-    """角色权限分配请求模型"""
+    """
+    角色权限分配请求模型
+
+    Attributes:
+        role_id: 角色ID
+        permission_ids: 权限ID列表
+    """
 
     role_id: UUID = Field(..., description="角色ID")
     permission_ids: list[UUID] = Field(..., description="权限ID列表")
@@ -414,7 +467,15 @@ class RolePermissionAssignRequest(BaseSchema):
 
 
 class SystemStats(BaseSchema):
-    """系统统计模型"""
+    """
+    系统统计信息模型
+
+    Attributes:
+        user_count: 用户总数
+        role_count: 角色总数
+        permission_count: 权限总数
+        audit_log_count: 审计日志总数
+    """
 
     total_users: int = Field(..., description="总用户数", ge=0)
     active_users: int = Field(..., description="活跃用户数", ge=0)
@@ -424,7 +485,13 @@ class SystemStats(BaseSchema):
 
 
 class UserActivityStats(BaseSchema):
-    """用户活动统计模型"""
+    """
+    用户活跃度统计模型
+
+    Attributes:
+        date: 日期
+        active_user_count: 活跃用户数
+    """
 
     user_id: UUID = Field(..., description="用户ID")
     login_count: int = Field(..., description="登录次数", ge=0)
@@ -436,7 +503,14 @@ class UserActivityStats(BaseSchema):
 
 
 class ErrorDetail(BaseSchema):
-    """错误详情模型"""
+    """
+    错误详情模型
+
+    Attributes:
+        loc: 错误位置
+        msg: 错误信息
+        type: 错误类型
+    """
 
     field: str | None = Field(None, description="错误字段")
     message: str = Field(..., description="错误信息")
@@ -444,7 +518,12 @@ class ErrorDetail(BaseSchema):
 
 
 class ValidationErrorResponse(BaseSchema):
-    """验证错误响应模型"""
+    """
+    校验错误响应模型
+
+    Attributes:
+        detail: 错误详情列表
+    """
 
     code: int = Field(422, description="状态码")
     message: str = Field("数据验证失败", description="提示信息")
