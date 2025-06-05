@@ -314,7 +314,6 @@ def require_all_roles(*required_roles: str) -> Callable:
 
 async def get_optional_user(
     credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer(auto_error=False)),
-    session: AsyncSession = Depends(get_async_session),
     service_factory: ServiceFactory = Depends(get_service_factory),
 ) -> User | None:
     """
@@ -322,7 +321,6 @@ async def get_optional_user(
 
     Args:
         credentials: HTTP Bearer 认证凭据（可选）
-        session: 数据库会话
         service_factory: 服务工厂
 
     Returns:

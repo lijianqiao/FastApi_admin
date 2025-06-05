@@ -55,6 +55,8 @@ class AdminSettings(BaseModel):
     username: str = Field(min_length=3, max_length=50, description="初始管理员用户名")
     email: str = Field(description="初始管理员邮箱")
     password: str = Field(min_length=8, description="初始管理员密码")
+    phone: str | None = Field(default=None, description="初始管理员手机号")
+    nickname: str | None = Field(default=None, description="初始管理员昵称")
 
     @field_validator("email")
     @classmethod
@@ -144,6 +146,8 @@ class Settings(BaseSettings):
     admin_username: str = Field(default="admin", min_length=3, max_length=50, description="初始管理员用户名")
     admin_email: str = Field(default="admin@example.com", description="初始管理员邮箱")
     admin_password: str = Field(default="admin@123", min_length=8, description="初始管理员密码")
+    admin_phone: str | None = Field(default="13800000000", description="初始管理员手机号")
+    admin_nickname: str | None = Field(default="超级管理员", description="初始管理员昵称")
 
     # === CORS 配置 ===
     cors_allow_credentials: bool = Field(default=True, description="CORS允许凭证")
@@ -205,6 +209,8 @@ class Settings(BaseSettings):
             username=self.admin_username,
             email=self.admin_email,
             password=self.admin_password,
+            phone=self.admin_phone,
+            nickname=self.admin_nickname,
         )
 
     @property

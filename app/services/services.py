@@ -8,8 +8,10 @@
 
 from typing import TypeVar
 
+from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.session import get_async_session
 from app.services.auth_service import AuthService
 from app.services.base import AppBaseService
 from app.services.permission_service import PermissionService
@@ -74,7 +76,7 @@ class ServiceFactory:
         self._instances.clear()
 
 
-async def get_service_factory(session: AsyncSession) -> ServiceFactory:
+async def get_service_factory(session: AsyncSession = Depends(get_async_session)) -> ServiceFactory:
     """
     获取服务工厂实例
 
