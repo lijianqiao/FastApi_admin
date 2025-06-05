@@ -6,17 +6,31 @@
 @Docs: FastAPI 应用程序入口点
 """
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from app.api import api_router
 from app.config import settings
+from app.db.session import database_manager
 from app.metrics import setup_metrics
 from app.middleware import setup_middlewares
-from app.middleware.cors import setup_cors_middleware
 
 
 def create_app() -> FastAPI:
     """创建 FastAPI 应用实例"""
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        # 应用启动时检查数据库连接
+        connected = await database_manager.check_connection()
+        if not connected:
+            raise RuntimeError("数据库连接失败，应用无法启动")
+        # 启动限流redis
+        yield
+        # 应用关闭时关闭数据库连接
+        await database_manager.close()
+
     app = FastAPI(
         title=settings.app_name,
         openapi_url=f"{settings.api_v1_prefix}/openapi.json",
@@ -25,23 +39,16 @@ def create_app() -> FastAPI:
         version=settings.app_version,
         description=settings.app_description,
         debug=settings.debug,
-        # contact={
-        #     "name": settings.app_contact_name,
-        #     "email": settings.app_contact_email,
-        #     "url": settings.app_contact_url,
-        # },
-        # license_info={
-        #     "name": settings.app_license_name,
-        #     "url": settings.app_license_url,
-        # },
-        # terms_of_service=settings.app_terms_of_service,
-        # lifespan=settings.lifespan,
+        contact={
+            "name": "li",
+            "email": "lijianqiao2906@live.com",
+            "url": "https://gitee.com/lijianqiao",
+        },
+        lifespan=lifespan,
     )
 
     # 设置所有中间件（包括CORS、限流、审计、错误处理等）
     setup_middlewares(app)
-
-    setup_cors_middleware(app)
 
     # 设置 Prometheus 指标
     setup_metrics(app)

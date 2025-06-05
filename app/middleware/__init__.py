@@ -10,6 +10,7 @@ from fastapi import FastAPI
 
 from .cors import setup_cors_middleware
 from .logging import setup_logging_middleware
+from .ratelimiter import setup_ratelimiter
 
 
 def setup_middlewares(app: FastAPI) -> None:
@@ -19,6 +20,9 @@ def setup_middlewares(app: FastAPI) -> None:
 
     # 设置CORS中间件
     setup_cors_middleware(app)
+
+    # 全局限流
+    setup_ratelimiter(app)
 
     # 其他中间件可以在这里添加
     # setup_rate_limiting_middleware(app)
