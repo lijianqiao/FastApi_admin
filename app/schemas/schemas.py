@@ -333,7 +333,7 @@ class AuditLogResponse(AuditLogBase, TimestampMixin):
 class LoginRequest(BaseSchema):
     """登录请求模型"""
 
-    username: str = Field(..., description="用户名、邮箱或手机号")
+    identifier: str = Field(..., description="用户名、邮箱或手机号")
     password: str = Field(..., description="密码")
     remember_me: bool = Field(False, description="记住我")
 
@@ -379,6 +379,18 @@ class UserInfo(BaseSchema):
     roles: list[str] = Field(default_factory=list, description="角色列表")
     permissions: list[str] = Field(default_factory=list, description="权限列表")
     avatar: str | None = Field(None, description="头像URL")
+
+
+class LoginResponse(TokenResponse):
+    """登录响应模型"""
+
+    user: UserInfo = Field(..., description="用户信息")
+
+
+class RefreshTokenResponse(TokenResponse):
+    """刷新令牌响应模型"""
+
+    pass
 
 
 # ===================== 角色权限分配模型 =====================

@@ -8,9 +8,11 @@
 
 from fastapi import FastAPI
 
+from app.api import api_router
 from app.config import settings
 from app.metrics import setup_metrics
 from app.middleware import setup_middlewares
+from app.middleware.cors import setup_cors_middleware
 
 
 def create_app() -> FastAPI:
@@ -18,16 +20,34 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
         openapi_url=f"{settings.api_v1_prefix}/openapi.json",
+        docs_url=f"{settings.api_v1_prefix}/docs",
+        redoc_url=f"{settings.api_v1_prefix}/redoc",
+        version=settings.app_version,
+        description=settings.app_description,
+        debug=settings.debug,
+        # contact={
+        #     "name": settings.app_contact_name,
+        #     "email": settings.app_contact_email,
+        #     "url": settings.app_contact_url,
+        # },
+        # license_info={
+        #     "name": settings.app_license_name,
+        #     "url": settings.app_license_url,
+        # },
+        # terms_of_service=settings.app_terms_of_service,
+        # lifespan=settings.lifespan,
     )
 
     # 设置所有中间件（包括CORS、限流、审计、错误处理等）
     setup_middlewares(app)
 
+    setup_cors_middleware(app)
+
     # 设置 Prometheus 指标
     setup_metrics(app)
 
     # 包含 API 路由
-    # app.include_router(api_router_v1, prefix=settings.api_v1_prefix, tags=["v1"])
+    app.include_router(api_router)
 
     return app
 

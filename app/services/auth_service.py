@@ -29,6 +29,7 @@ from app.models import User
 from app.repositories import UserRepository
 from app.schemas.schemas import (
     LoginRequest,
+    LoginResponse,
     LogoutRequest,
     LogoutResponse,
     RefreshTokenRequest,
@@ -76,10 +77,9 @@ class AuthService(AppBaseService[User, UUID]):
         user_id = payload.get("sub")
 
         if not user_id:
-            raise InvalidTokenError("访问令牌")
-
-        # 获取用户信息
+            raise InvalidTokenError("访问令牌")  # 获取用户信息
         user = await self.user_repo.get_by_id(UUID(user_id))
+
         if not user:
             self.logger.warning(f"令牌验证失败: 用户不存在 - {user_id}")
             raise AuthenticationError("用户不存在")
@@ -104,13 +104,11 @@ class AuthService(AppBaseService[User, UUID]):
             AuthenticationError: 认证失败
             ValidationError: 数据验证失败
         """
-        self.logger.info(f"用户尝试登录: {login_data.username}")
-
-        # 根据用户名、邮箱或手机号查找用户
-        user = await self._get_user_by_identifier(login_data.username)
+        self.logger.info(f"用户尝试登录: {login_data.identifier}")  # 根据用户名、邮箱或手机号查找用户
+        user = await self._get_user_by_identifier(login_data.identifier)
 
         if not user:
-            self.logger.warning(f"登录失败: 用户不存在 - {login_data.username}")
+            self.logger.warning(f"登录失败: 用户不存在 - {login_data.identifier}")
             raise AuthenticationError("用户名或密码错误")
 
         # 检查用户状态
@@ -463,3 +461,59 @@ class AuthService(AppBaseService[User, UUID]):
             await self.session.commit()
         except Exception as e:
             self.logger.error(f"更新最后登录时间失败: {e}")
+
+    async def authenticate_user(self, identifier: str, password: str, remember_me: bool = False) -> LoginResponse:
+        """
+        用户认证接口方法 - 供API端点调用
+
+        Args:
+            identifier: 用户名、邮箱或手机号
+            password: 密码
+            remember_me: 是否记住登录状态
+
+        Returns:
+            登录响应数据（包含令牌和用户信息）
+
+        Raises:
+            AuthenticationError: 认证失败
+            ValidationError: 数据验证失败
+        """
+        # 使用现有的login方法获取令牌
+        login_request = LoginRequest(identifier=identifier, password=password, remember_me=remember_me)
+        token_response = await self.login(login_request)
+
+        # 获取用户信息
+        user = await self._get_user_by_identifier(identifier)
+        if not user:
+            raise AuthenticationError("用户不存在")
+
+        # 构建用户角色和权限列表
+        role_names = [role.name for role in user.roles] if user.roles else []
+        permission_codes = []
+        if user.roles:
+            for role in user.roles:
+                if role.permissions:
+                    permission_codes.extend([perm.code for perm in role.permissions])
+        permission_codes = list(set(permission_codes))
+
+        # 构建用户信息
+        user_info = UserInfo(
+            id=user.id,
+            username=user.username,
+            email=user.email,
+            phone=user.phone,
+            nickname=user.nickname,
+            is_superuser=user.is_superuser,
+            roles=role_names,
+            permissions=permission_codes,
+            avatar=None,
+        )
+
+        # 返回包含用户信息的登录响应
+        return LoginResponse(
+            access_token=token_response.access_token,
+            token_type=token_response.token_type,
+            expires_in=token_response.expires_in,
+            refresh_token=token_response.refresh_token,
+            user=user_info,
+        )

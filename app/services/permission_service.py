@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import DuplicateRecordError, RecordNotFoundError
 from app.models import Permission
-from app.repositories import PermissionRepository, RoleRepository
+from app.repositories import PermissionRepository, RoleRepository, UserRepository
 from app.schemas import (
     BaseQuery,
     PagedResponse,
@@ -41,6 +41,10 @@ class PermissionService(AppBaseService[Permission, UUID]):
         self.permission_repo: PermissionRepository = self.repository  # type: ignore
         # 权限服务需要访问角色仓储来管理角色权限关联
         self.role_repo = RoleRepository(session=self.session)
+        # 权限服务需要访问用户仓储来获取用户权限
+        self.user_repo = UserRepository(session=self.session)
+        # 权限服务需要访问用户仓储来获取用户权限
+        self.user_repo = UserRepository(session=self.session)
 
     @audit_create(resource="Permission", get_id=get_permission_id)
     async def create_permission(
@@ -593,3 +597,35 @@ class PermissionService(AppBaseService[Permission, UUID]):
             raise RecordNotFoundError(f"权限不存在: {permission_id}")
 
         return [role.id for role in permission.roles]
+
+    async def get_user_permissions(self, user_id: UUID) -> list[PermissionResponse]:
+        """获取用户的所有权限（通过角色）
+
+        Args:
+            user_id: 用户ID
+
+        Returns:
+            用户权限列表
+
+        Raises:
+            RecordNotFoundError: 当用户不存在时
+        """
+        logger.info(f"获取用户 {user_id} 的权限列表")
+
+        # 获取用户信息
+        user = await self.user_repo.get_by_id(user_id)
+        if not user:
+            raise RecordNotFoundError(f"用户不存在: {user_id}")
+
+        # 收集用户所有角色的权限
+        user_permissions = []
+        permission_ids_seen = set()  # 用于去重
+
+        for role in user.roles:
+            for permission in role.permissions:
+                if permission.id not in permission_ids_seen:
+                    user_permissions.append(permission)
+                    permission_ids_seen.add(permission.id)
+
+        logger.info(f"用户 {user_id} 共有 {len(user_permissions)} 个权限")
+        return [PermissionResponse.model_validate(p) for p in user_permissions]
