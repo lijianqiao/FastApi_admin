@@ -59,6 +59,9 @@ known-first-party = ["app"]
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
+    "pytest>=8.4.0",
+    "pytest-asyncio>=1.0.0",
     "ruff>=0.11.11",
 ]
 

@@ -341,7 +341,7 @@ class AuthService(AppBaseService[User, UUID]):
             # token_jti = payload.get("jti")  # JWT ID，需要在生成token时添加
             # if token_jti:
             #     token_exp = payload.get("exp")
-            #     current_time = datetime.utcnow().timestamp()
+            #     current_time = datetime.now(UTC).timestamp()
             #     ttl = int(token_exp - current_time) if token_exp > current_time else 0
             #     if ttl > 0:
             #         await self.redis_client.setex(f"blacklist:{token_jti}", ttl, "1")

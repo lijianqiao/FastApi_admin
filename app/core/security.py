@@ -8,7 +8,7 @@
 提供密码哈希、JWT令牌生成和验证等安全功能。
 """
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from jose import JWTError, jwt
@@ -69,9 +69,9 @@ def create_access_token(
     to_encode = data.copy()
 
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.jwt.access_token_expire_minutes)
+        expire = datetime.now(UTC) + timedelta(minutes=settings.jwt.access_token_expire_minutes)
 
     to_encode.update({"exp": expire, "type": "access"})
 
@@ -101,9 +101,9 @@ def create_refresh_token(
     to_encode = data.copy()
 
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(days=settings.jwt.refresh_token_expire_days)
+        expire = datetime.now(UTC) + timedelta(days=settings.jwt.refresh_token_expire_days)
 
     to_encode.update({"exp": expire, "type": "refresh"})
 
