@@ -12,6 +12,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_async_session
+from app.services.audit_service import AuditLogService
 from app.services.auth_service import AuthService
 from app.services.base import AppBaseService
 from app.services.permission_service import PermissionService
@@ -55,6 +56,12 @@ class ServiceFactory:
         if "role" not in self._instances:
             self._instances["role"] = RoleService(self.session)
         return self._instances["role"]
+
+    def get_audit_log_service(self) -> AuditLogService:
+        """获取审计日志服务实例"""
+        if "audit_log" not in self._instances:
+            self._instances["audit_log"] = AuditLogService(self.session)
+        return self._instances["audit_log"]
 
     def get_service(self, service_class: type[T]) -> T:
         """
