@@ -12,6 +12,7 @@ license = "MIT"
 authors = [{ name = "lijianqiao", email = "lijianqiao2906@live.com" }]
 dependencies = [
     "advanced-alchemy>=1.4.4",
+    "aioredis>=2.0.1",
     "alembic>=1.16.1",
     "asyncpg>=0.30.0",
     "bcrypt==4.0.1",

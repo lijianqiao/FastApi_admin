@@ -15,6 +15,7 @@ from app.config import settings
 from app.db.session import database_manager
 from app.metrics import setup_metrics
 from app.middleware import setup_middlewares
+from app.services.cache_service import cache_service
 
 
 def create_app() -> FastAPI:
@@ -26,10 +27,15 @@ def create_app() -> FastAPI:
         connected = await database_manager.check_connection()
         if not connected:
             raise RuntimeError("数据库连接失败，应用无法启动")
-        # 启动限流redis
+
+        # 初始化缓存服务
+        await cache_service.init_redis()
+
         yield
-        # 应用关闭时关闭数据库连接
+
+        # 应用关闭时关闭连接
         await database_manager.close()
+        await cache_service.close()
 
     app = FastAPI(
         title=settings.app_name,

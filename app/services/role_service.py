@@ -31,6 +31,7 @@ from app.schemas import (
     UserWithRoles,
 )
 from app.services.base import AppBaseService
+from app.services.cache_service import cache_service
 from app.utils.audit import (
     audit_create,
     audit_delete,
@@ -102,10 +103,16 @@ class RoleService(AppBaseService[Role, UUID]):
 
         async with self.transaction():
             updated_role_orm = await self.role_repo.update_record(role_id, update_data_dict)
-
         if not updated_role_orm:
             raise RecordNotFoundError(resource="角色", resource_id=role_id)  # 理论上不会执行
         self.logger.info(f"角色 {updated_role_orm.name} (ID: {role_id}) 更新成功。")
+
+        # 清理角色相关缓存
+        try:
+            await cache_service.clear_role_cache(str(role_id))
+        except Exception as cache_error:
+            self.logger.warning(f"清理角色缓存失败: {cache_error}")
+
         return RoleResponse.model_validate(updated_role_orm)
 
     @audit_delete(resource="Role", get_id=get_role_id)
@@ -117,6 +124,12 @@ class RoleService(AppBaseService[Role, UUID]):
         """删除角色"""
         self.logger.info(f"尝试删除角色 {role_id} (硬删除: {hard_delete})。")
 
+        # 先获取角色信息以便清理用户缓存
+        user_ids = []
+        role_orm = await self.role_repo.get_by_id(role_id)
+        if role_orm:
+            user_ids = [user.id for user in role_orm.users]
+
         async with self.transaction():
             # 调用基类的 delete_record_svc，它会返回被删除的 ORM 对象 (或软删除后的对象)
             # commit=False 因为外层有 transaction 管理器
@@ -124,6 +137,16 @@ class RoleService(AppBaseService[Role, UUID]):
 
         if not deleted_role_orm:  # 基类 delete_record_svc 在找不到时会抛出 HTTPException(404)
             raise RecordNotFoundError(resource="角色", resource_id=role_id)
+
+        # 清理角色相关缓存
+        try:
+            await cache_service.clear_role_cache(str(role_id))
+            # 清理相关用户的缓存（因为他们的角色列表已发生变化）
+            for user_id in user_ids:
+                await cache_service.clear_user_cache(str(user_id))
+        except Exception as cache_error:
+            self.logger.warning(f"清理缓存失败: {cache_error}")
+
         self.logger.info(f"角色 {role_id} ({deleted_role_orm.name}) 已被删除 (硬删除: {hard_delete})。")
         return RoleResponse.model_validate(deleted_role_orm)
 
@@ -180,7 +203,6 @@ class RoleService(AppBaseService[Role, UUID]):
         return role_responses, total
 
     # ===================== 用户角色管理功能 =====================
-
     @audit_update(resource="Role", get_id=lambda result: str(result.role_id))
     async def assign_users_to_role(
         self,
@@ -217,6 +239,15 @@ class RoleService(AppBaseService[Role, UUID]):
         if not updated_role_orm:
             raise RecordNotFoundError(resource="角色", resource_id=role_id)
 
+        # 清理相关缓存
+        try:
+            await cache_service.clear_role_cache(str(role_id))
+            # 清理受影响用户的缓存
+            for user_id in user_ids:
+                await cache_service.clear_user_cache(str(user_id))
+        except Exception as cache_error:
+            self.logger.warning(f"清理缓存失败: {cache_error}")
+
         self.logger.info(f"成功为角色 {role_id} 分配了 {len(user_ids)} 个用户")
         return RoleWithUsers.model_validate(updated_role_orm)
 
@@ -244,6 +275,16 @@ class RoleService(AppBaseService[Role, UUID]):
 
         if not updated_role_orm:
             raise RecordNotFoundError(resource="角色", resource_id=role_id)
+
+        # 清理相关缓存
+        try:
+            await cache_service.clear_role_cache(str(role_id))
+            # 清理受影响用户的缓存
+            for user_id in user_ids:
+                await cache_service.clear_user_cache(str(user_id))
+        except Exception as cache_error:
+            self.logger.warning(f"清理缓存失败: {cache_error}")
+
         self.logger.info(f"成功从角色 {role_id} 移除了 {len(user_ids)} 个用户")
         return RoleWithUsers.model_validate(updated_role_orm)
 
@@ -291,7 +332,6 @@ class RoleService(AppBaseService[Role, UUID]):
             missing_role_ids = set(role_ids) - found_role_ids
             if missing_role_ids:
                 raise RecordNotFoundError(resource="角色", resource_id=str(list(missing_role_ids)))
-
         async with self.transaction():
             # 清空现有角色，重新分配
             user_orm.roles = []
@@ -306,6 +346,15 @@ class RoleService(AppBaseService[Role, UUID]):
             updated_user_orm = await self.user_repo.update_record(user_id, {})
             if not updated_user_orm:
                 raise RecordNotFoundError(resource="用户", resource_id=user_id)
+
+        # 清理用户相关缓存
+        try:
+            await cache_service.clear_user_cache(str(user_id))
+            # 清理受影响角色的缓存
+            for role_id in role_ids:
+                await cache_service.clear_role_cache(str(role_id))
+        except Exception as cache_error:
+            self.logger.warning(f"清理缓存失败: {cache_error}")
 
         # 使用预加载优化的方法重新获取用户及其角色信息
         final_user_orm = await self.user_repo.get_with_roles(user_id)

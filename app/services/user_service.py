@@ -34,6 +34,7 @@ from app.schemas.schemas import (
     UserWithRoles,
 )
 from app.services.base import AppBaseService
+from app.services.cache_service import cache_service
 from app.utils.audit import audit_log
 
 
@@ -175,6 +176,12 @@ class UserService(AppBaseService[User, UUID]):
             updated_user = await self.update_record_svc(user_id, update_dict)
             username = getattr(updated_user, "username", "未知用户")
             self.logger.info(f"用户更新成功: {username} (ID: {user_id})")
+
+            # 清理用户相关缓存（用户信息变更可能影响权限验证）
+            try:
+                await cache_service.clear_user_cache(str(user_id))
+            except Exception as cache_error:
+                self.logger.warning(f"清理用户缓存失败: {cache_error}")
 
             return UserResponse.model_validate(updated_user)
 
@@ -324,6 +331,11 @@ class UserService(AppBaseService[User, UUID]):
 
             if success:
                 self.logger.info(f"用户删除成功: {user_id}")
+                # 清理用户相关缓存
+                try:
+                    await cache_service.clear_user_cache(str(user_id))
+                except Exception as cache_error:
+                    self.logger.warning(f"清理用户缓存失败: {cache_error}")
             else:
                 self.logger.warning(f"用户删除失败: {user_id}")
 
@@ -376,6 +388,13 @@ class UserService(AppBaseService[User, UUID]):
 
             self.logger.info(f"批量删除用户完成: 成功 {success_count}, 失败 {failed_count}")
 
+            # 批量清理用户相关缓存
+            try:
+                for user_id in request.ids:
+                    await cache_service.clear_user_cache(str(user_id))
+            except Exception as cache_error:
+                self.logger.warning(f"批量清理用户缓存失败: {cache_error}")
+
             return BatchOperationResponse(
                 success_count=success_count,
                 failed_count=failed_count,
@@ -422,6 +441,13 @@ class UserService(AppBaseService[User, UUID]):
             await self.session.commit()
 
             self.logger.info(f"批量更新用户状态完成: 成功 {success_count}, 失败 {failed_count}")
+
+            # 批量清理用户相关缓存（状态变更可能影响权限验证）
+            try:
+                for user_id in request.ids:
+                    await cache_service.clear_user_cache(str(user_id))
+            except Exception as cache_error:
+                self.logger.warning(f"批量清理用户缓存失败: {cache_error}")
 
             return BatchOperationResponse(
                 success_count=success_count,

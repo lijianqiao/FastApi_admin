@@ -137,6 +137,10 @@ class Settings(BaseSettings):
     # === Redis 配置 ===
     redis_url: RedisDsn | None = Field(default=None, description="Redis连接URL")
 
+    # === 缓存配置 ===
+    cache_expire_minutes: int = Field(default=30, ge=5, le=1440, description="缓存过期时间(分钟)")
+    cache_key_prefix: str = Field(default="cache_T", description="缓存键前缀")
+
     # === 日志配置 ===
     log_level: LogLevel = Field(default=LogLevel.INFO, description="日志级别")
     log_directory: str = Field(default="logs", description="日志文件存储目录")

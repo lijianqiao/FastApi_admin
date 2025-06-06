@@ -37,6 +37,7 @@ from app.schemas.schemas import (
     UserInfo,
 )
 from app.services.base import AppBaseService
+from app.services.cache_service import cache_service
 
 
 class AuthService(AppBaseService[User, UUID]):
@@ -71,13 +72,17 @@ class AuthService(AppBaseService[User, UUID]):
             TokenExpiredError: 访问令牌已过期
             InvalidTokenError: 无效的访问令牌
             AuthenticationError: 用户不存在或已被禁用
-        """
-        # 解码访问令牌
+        """  # 解码访问令牌
         payload = decode_access_token(access_token)
         user_id = payload.get("sub")
+        jti = payload.get("jti")
 
-        if not user_id:
+        if not user_id or not jti:
             raise InvalidTokenError("访问令牌")
+
+        # 检查token是否在黑名单中
+        if await cache_service.is_token_blacklisted(jti):
+            raise InvalidTokenError("令牌已失效")
 
         # 使用预加载优化获取用户信息（包含角色和权限）
         user = await self.user_repo.get_with_roles(UUID(user_id))
@@ -128,9 +133,7 @@ class AuthService(AppBaseService[User, UUID]):
             raise AuthenticationError("用户名或密码错误")
 
         # 更新最后登录时间
-        await self._update_last_login(user)
-
-        # 生成令牌
+        await self._update_last_login(user)  # 生成令牌
         token_data = {
             "sub": str(user.id),
             "username": user.username,
@@ -139,6 +142,25 @@ class AuthService(AppBaseService[User, UUID]):
         }
 
         tokens = generate_token_pair(token_data)
+
+        # 预热用户权限和角色缓存
+        try:
+            # 获取用户权限和角色信息并设置缓存
+            user_with_roles = await self.user_repo.get_with_roles(user.id)
+            if user_with_roles:
+                # 预热用户角色缓存
+                roles_data = [{"id": str(role.id), "name": role.name} for role in user_with_roles.roles]
+                await cache_service.set_user_roles(str(user.id), roles_data)
+
+                # 预热用户权限缓存（通过角色获取）
+                from app.services.permission_service import PermissionService
+
+                permission_service = PermissionService(self.session)
+                user_permissions = await permission_service.get_user_permissions(user.id)
+                permission_names = [perm.name for perm in user_permissions]
+                await cache_service.set_user_permissions(str(user.id), permission_names)
+        except Exception as cache_error:
+            self.logger.warning(f"登录时预热缓存失败: {cache_error}")
 
         self.logger.info(f"用户登录成功: {user.username} ({user.id})")
 
@@ -322,31 +344,29 @@ class AuthService(AppBaseService[User, UUID]):
             AuthenticationError: 认证失败
         """
         self.logger.info("用户开始登出")
-
         try:
             # 使用通用方法验证令牌并获取用户
             user = await self._validate_and_get_user_from_token(logout_data.access_token)
 
-            # TODO: 实现token黑名单功能
-            # 1. 将当前access_token添加到Redis黑名单
-            # 2. 如果all_devices为True，将用户的所有token都加入黑名单
-            # 3. 设置黑名单过期时间为token的剩余有效期
-            #
-            # 示例实现：
-            # if logout_data.all_devices:
-            #     # 登出所有设备：清除用户的所有refresh token
-            #     await self.redis_client.delete(f"user_tokens:{user_id}")
-            #     await self.redis_client.delete(f"refresh_tokens:{user_id}:*")
-            #
-            # # 将当前access token添加到黑名单
-            # payload = decode_access_token(logout_data.access_token)
-            # token_jti = payload.get("jti")  # JWT ID，需要在生成token时添加
-            # if token_jti:
-            #     token_exp = payload.get("exp")
-            #     current_time = datetime.now(UTC).timestamp()
-            #     ttl = int(token_exp - current_time) if token_exp > current_time else 0
-            #     if ttl > 0:
-            #         await self.redis_client.setex(f"blacklist:{token_jti}", ttl, "1")
+            # 解码token获取JTI和过期时间
+            payload = decode_access_token(logout_data.access_token)
+            token_jti = payload.get("jti")
+            token_exp = payload.get("exp")
+
+            if token_jti and token_exp:
+                # 计算token剩余有效时间
+                current_time = datetime.now(UTC).timestamp()
+                ttl = int(token_exp - current_time) if token_exp > current_time else 0
+
+                if ttl > 0:
+                    # 将当前access token添加到黑名单
+                    await cache_service.add_token_to_blacklist(token_jti, ttl)
+
+                # 如果是全设备登出，清除用户的所有token
+                if logout_data.all_devices:
+                    await cache_service.clear_user_tokens(str(user.id))
+                    # 同时清理用户的权限和角色缓存
+                    await cache_service.clear_user_cache(str(user.id))
 
             self.logger.info(f"用户登出成功: {user.username} ({user.id})")
 

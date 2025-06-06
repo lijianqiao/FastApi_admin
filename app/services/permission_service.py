@@ -25,6 +25,7 @@ from app.schemas import (
     PermissionWithRoles,
 )
 from app.services.base import AppBaseService
+from app.services.cache_service import cache_service
 from app.utils.audit import audit_create, audit_delete, audit_update, get_permission_id
 from app.utils.logger import get_logger
 
@@ -190,6 +191,19 @@ class PermissionService(AppBaseService[Permission, UUID]):
         update_data = permission_data.model_dump(exclude_unset=True)
         updated_permission = await self.permission_repo.update_record(permission_id, update_data)
 
+        # 清理相关缓存（权限更新可能影响拥有该权限的角色和用户）
+        try:
+            # 获取拥有该权限的角色ID列表
+            roles_with_permission = await self.get_roles_by_permission(permission_id)
+            # 清理角色权限缓存
+            for role_id in roles_with_permission:
+                await cache_service.clear_role_cache(str(role_id))
+
+            # 清理拥有这些角色的用户缓存需要查询数据库，这里简化处理
+            # 在实际应用中可以考虑更精细的缓存失效策略
+        except Exception as cache_error:
+            logger.warning(f"清理权限相关缓存失败: {cache_error}")
+
         logger.info(f"权限更新成功: ID={permission_id}")
         return PermissionResponse.model_validate(updated_permission)
 
@@ -217,6 +231,13 @@ class PermissionService(AppBaseService[Permission, UUID]):
         if not permission:
             raise RecordNotFoundError(f"权限不存在: {permission_id}")
 
+        # 获取拥有该权限的角色ID列表（在删除前）
+        roles_with_permission = []
+        try:
+            roles_with_permission = await self.get_roles_by_permission(permission_id)
+        except Exception:
+            pass  # 如果获取失败，继续删除操作
+
         if hard_delete:
             # 硬删除：物理删除记录
             await self.permission_repo.delete_record(permission_id, hard_delete=True)
@@ -224,6 +245,14 @@ class PermissionService(AppBaseService[Permission, UUID]):
         else:
             # 软删除：更新 is_deleted 字段
             deleted_permission = await self.permission_repo.update_record(permission_id, {"is_deleted": True})
+
+        # 清理相关缓存
+        try:
+            # 清理角色权限缓存
+            for role_id in roles_with_permission:
+                await cache_service.clear_role_cache(str(role_id))
+        except Exception as cache_error:
+            logger.warning(f"清理权限删除相关缓存失败: {cache_error}")
 
         logger.info(f"权限删除成功: ID={permission_id}")
         return PermissionResponse.model_validate(deleted_permission)
@@ -368,11 +397,27 @@ class PermissionService(AppBaseService[Permission, UUID]):
         await self.validate_permissions(permission_ids)
 
         updated_permissions = []
+        affected_role_ids = set()
+
         for permission_id in permission_ids:
             permission = await self.permission_repo.get_by_id(permission_id)
             if permission:
                 updated_permission = await self.permission_repo.update_record(permission_id, {"is_active": is_active})
                 updated_permissions.append(PermissionResponse.model_validate(updated_permission))
+
+                # 收集受影响的角色ID
+                try:
+                    roles_with_permission = await self.get_roles_by_permission(permission_id)
+                    affected_role_ids.update(roles_with_permission)
+                except Exception:
+                    pass
+
+        # 批量清理相关缓存
+        try:
+            for role_id in affected_role_ids:
+                await cache_service.clear_role_cache(str(role_id))
+        except Exception as cache_error:
+            logger.warning(f"批量清理权限状态更新相关缓存失败: {cache_error}")
 
         logger.info(f"批量更新权限状态成功: {len(updated_permissions)} 个权限")
         return updated_permissions
@@ -396,15 +441,31 @@ class PermissionService(AppBaseService[Permission, UUID]):
         await self.validate_permissions(permission_ids)
 
         deleted_permissions = []
+        affected_role_ids = set()
+
         for permission_id in permission_ids:
             permission = await self.permission_repo.get_by_id(permission_id)
             if permission:
+                # 收集受影响的角色ID（在删除前）
+                try:
+                    roles_with_permission = await self.get_roles_by_permission(permission_id)
+                    affected_role_ids.update(roles_with_permission)
+                except Exception:
+                    pass
+
                 if hard_delete:
                     await self.permission_repo.delete_record(permission_id, hard_delete=True)
                     deleted_permissions.append(PermissionResponse.model_validate(permission))
                 else:
                     deleted_permission = await self.permission_repo.update_record(permission_id, {"is_deleted": True})
                     deleted_permissions.append(PermissionResponse.model_validate(deleted_permission))
+
+        # 批量清理相关缓存
+        try:
+            for role_id in affected_role_ids:
+                await cache_service.clear_role_cache(str(role_id))
+        except Exception as cache_error:
+            logger.warning(f"批量清理权限删除相关缓存失败: {cache_error}")
 
         logger.info(f"批量删除权限成功: {len(deleted_permissions)} 个权限")
         return deleted_permissions
@@ -499,6 +560,14 @@ class PermissionService(AppBaseService[Permission, UUID]):
         if not updated_permission:
             raise RecordNotFoundError(f"权限不存在: {permission_id}")
 
+        # 清理相关缓存
+        try:
+            # 清理受影响角色的缓存
+            for role_id in role_ids:
+                await cache_service.clear_role_cache(str(role_id))
+        except Exception as cache_error:
+            logger.warning(f"清理权限分配相关缓存失败: {cache_error}")
+
         logger.info(f"权限 {permission_id} 角色分配成功")
         return PermissionWithRoles(
             **PermissionResponse.model_validate(updated_permission).model_dump(),
@@ -538,6 +607,14 @@ class PermissionService(AppBaseService[Permission, UUID]):
         updated_permission = await self.permission_repo.get_by_id(permission_id)
         if not updated_permission:
             raise RecordNotFoundError(f"权限不存在: {permission_id}")
+
+        # 清理相关缓存
+        try:
+            # 清理受影响角色的缓存
+            for role_id in role_ids:
+                await cache_service.clear_role_cache(str(role_id))
+        except Exception as cache_error:
+            logger.warning(f"清理权限移除相关缓存失败: {cache_error}")
 
         logger.info(f"权限 {permission_id} 角色移除成功")
         return PermissionWithRoles(
@@ -607,11 +684,23 @@ class PermissionService(AppBaseService[Permission, UUID]):
         logger.info(f"批量分配权限给角色: {len(permission_role_mapping)} 个权限")
 
         updated_permissions = []
+        affected_role_ids = set()
+
         async with self.transaction():
             for permission_id, role_ids in permission_role_mapping.items():
                 updated_permission = await self.assign_permission_to_roles(permission_id, role_ids, updated_by)
                 updated_permissions.append(updated_permission)
-                logger.info(f"批量权限分配成功: {len(updated_permissions)} 个权限")
+                # 收集受影响的角色ID
+                affected_role_ids.update(role_ids)
+
+        # 批量清理相关缓存
+        try:
+            for role_id in affected_role_ids:
+                await cache_service.clear_role_cache(str(role_id))
+        except Exception as cache_error:
+            logger.warning(f"批量权限分配缓存清理失败: {cache_error}")
+
+        logger.info(f"批量权限分配成功: {len(updated_permissions)} 个权限")
         return updated_permissions
 
     async def get_roles_by_permission(self, permission_id: UUID) -> list[UUID]:

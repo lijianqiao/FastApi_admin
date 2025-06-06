@@ -8,6 +8,7 @@
 提供密码哈希、JWT令牌生成和验证等安全功能。
 """
 
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -73,7 +74,9 @@ def create_access_token(
     else:
         expire = datetime.now(UTC) + timedelta(minutes=settings.jwt.access_token_expire_minutes)
 
-    to_encode.update({"exp": expire, "type": "access"})
+    # 添加JTI（JWT ID）用于黑名单功能
+    jti = str(uuid.uuid4())
+    to_encode.update({"exp": expire, "type": "access", "jti": jti})
 
     encoded_jwt = jwt.encode(
         to_encode,

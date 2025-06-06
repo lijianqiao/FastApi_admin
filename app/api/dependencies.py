@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import decode_access_token
 from app.db.session import get_async_session
 from app.models.models import User
+from app.services.cache_service import cache_service
 from app.services.services import ServiceFactory, get_service_factory
 
 # OAuth2 Bearer Token 获取
@@ -66,8 +67,21 @@ async def get_current_user(
         # 解码访问令牌
         payload = decode_access_token(token)
         user_id = payload.get("sub")
-        if user_id is None:
+        jti = payload.get("jti")
+
+        if user_id is None or jti is None:
             raise credentials_exception
+
+        # 检查token是否在黑名单中
+        if await cache_service.is_token_blacklisted(jti):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token 已被撤销",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+    except HTTPException:
+        raise
     except Exception:
         raise credentials_exception from None
 
@@ -149,17 +163,27 @@ def require_permissions(*required_permissions: str) -> Callable:
         if current_user.is_superuser:
             return current_user
 
-        # 检查用户权限
-        permission_service = service_factory.get_permission_service()
-        user_permissions = await permission_service.get_user_permissions(current_user.id)
-        user_permission_names = {perm.name for perm in user_permissions}
+        # 先尝试从缓存获取用户权限
+        user_permission_names = await cache_service.get_user_permissions(str(current_user.id))
+
+        if user_permission_names is None:
+            # 缓存未命中，从数据库查询
+            permission_service = service_factory.get_permission_service()
+            user_permissions = await permission_service.get_user_permissions(current_user.id)
+            user_permission_names_set = {perm.name for perm in user_permissions}
+
+            # 设置缓存
+            await cache_service.set_user_permissions(str(current_user.id), list(user_permission_names_set))
+        else:
+            # 从缓存获取的是list，转换为set以便后续处理
+            user_permission_names_set = set(user_permission_names)
 
         # 检查是否拥有所需的所有权限
-        missing_permissions = set(required_permissions) - user_permission_names
+        missing_permissions = set(required_permissions) - user_permission_names_set
         if missing_permissions:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Missing permissions: {', '.join(missing_permissions)}",
+                detail=f"缺少权限： {', '.join(missing_permissions)}",
             )
 
         return current_user
@@ -194,20 +218,31 @@ def require_roles(*required_roles: str) -> Callable:
 
         Raises:
             HTTPException: 当角色不符时
-        """  # 超级管理员拥有所有角色
+        """
+        # 超级管理员拥有所有角色
         if current_user.is_superuser:
             return current_user
 
         # 检查用户角色
-        user_service = service_factory.get_user_service()
-        user_with_roles = await user_service.get_user_roles(current_user.id)
-        user_role_names = {role.name for role in user_with_roles.roles}
+        user_roles = await cache_service.get_user_roles(str(current_user.id))
+
+        if user_roles is None:
+            # 缓存未命中，从数据库查询
+            user_service = service_factory.get_user_service()
+            user_with_roles = await user_service.get_user_roles(current_user.id)
+            user_role_names = {role.name for role in user_with_roles.roles}
+
+            # 设置缓存
+            roles_data = [{"id": str(role.id), "name": role.name} for role in user_with_roles.roles]
+            await cache_service.set_user_roles(str(current_user.id), roles_data)
+        else:
+            user_role_names = {role["name"] for role in user_roles}
 
         # 检查是否拥有所需的任一角色
         if not any(role in user_role_names for role in required_roles):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Required roles: {', '.join(required_roles)}",
+                detail=f"所需角色： {', '.join(required_roles)}",
             )
 
         return current_user
@@ -248,15 +283,24 @@ def require_any_permission(*required_permissions: str) -> Callable:
             return current_user
 
         # 检查用户权限
-        permission_service = service_factory.get_permission_service()
-        user_permissions = await permission_service.get_user_permissions(current_user.id)
-        user_permission_names = {perm.name for perm in user_permissions}
+        user_permission_names = await cache_service.get_user_permissions(str(current_user.id))
+
+        if user_permission_names is None:
+            # 缓存未命中，从数据库查询
+            permission_service = service_factory.get_permission_service()
+            user_permissions = await permission_service.get_user_permissions(current_user.id)
+            user_permission_names_set = {perm.name for perm in user_permissions}
+
+            # 设置缓存
+            await cache_service.set_user_permissions(str(current_user.id), list(user_permission_names_set))
+        else:
+            user_permission_names_set = set(user_permission_names)
 
         # 检查是否拥有任一所需权限
-        if not any(perm in user_permission_names for perm in required_permissions):
+        if not any(perm in user_permission_names_set for perm in required_permissions):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Required any of permissions: {', '.join(required_permissions)}",
+                detail=f"需要任何权限： {', '.join(required_permissions)}",
             )
 
         return current_user
@@ -294,17 +338,29 @@ def require_all_roles(*required_roles: str) -> Callable:
         """
         # 超级管理员拥有所有角色
         if current_user.is_superuser:
-            return current_user  # 检查用户角色
-        user_service = service_factory.get_user_service()
-        user_with_roles = await user_service.get_user_roles(current_user.id)
-        user_role_names = {role.name for role in user_with_roles.roles}
+            return current_user
+
+        # 检查用户角色
+        user_roles = await cache_service.get_user_roles(str(current_user.id))
+
+        if user_roles is None:
+            # 缓存未命中，从数据库查询
+            user_service = service_factory.get_user_service()
+            user_with_roles = await user_service.get_user_roles(current_user.id)
+            user_role_names = {role.name for role in user_with_roles.roles}
+
+            # 设置缓存
+            roles_data = [{"id": str(role.id), "name": role.name} for role in user_with_roles.roles]
+            await cache_service.set_user_roles(str(current_user.id), roles_data)
+        else:
+            user_role_names = {role["name"] for role in user_roles}
 
         # 检查是否拥有所有指定角色
         missing_roles = set(required_roles) - user_role_names
         if missing_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Missing roles: {', '.join(missing_roles)}",
+                detail=f"缺少的角色： {', '.join(missing_roles)}",
             )
 
         return current_user
@@ -354,18 +410,42 @@ class PermissionChecker:
         """检查用户是否拥有指定权限"""
         if user.is_superuser:
             return True
-        permission_service = self.service_factory.get_permission_service()
-        user_permissions = await permission_service.get_user_permissions(user.id)
-        return any(perm.name == permission for perm in user_permissions)
+
+        # 先尝试从缓存获取用户权限
+        user_permission_names = await cache_service.get_user_permissions(str(user.id))
+
+        if user_permission_names is None:
+            # 缓存未命中，从数据库查询
+            permission_service = self.service_factory.get_permission_service()
+            user_permissions = await permission_service.get_user_permissions(user.id)
+            user_permission_names = [perm.name for perm in user_permissions]
+
+            # 设置缓存
+            await cache_service.set_user_permissions(str(user.id), user_permission_names)
+
+        return permission in user_permission_names
 
     async def has_role(self, user: User, role: str) -> bool:
         """检查用户是否拥有指定角色"""
         if user.is_superuser:
             return True
 
-        user_service = self.service_factory.get_user_service()
-        user_with_roles = await user_service.get_user_roles(user.id)
-        return any(r.name == role for r in user_with_roles.roles)
+        # 检查用户角色
+        user_roles = await cache_service.get_user_roles(str(user.id))
+
+        if user_roles is None:
+            # 缓存未命中，从数据库查询
+            user_service = self.service_factory.get_user_service()
+            user_with_roles = await user_service.get_user_roles(user.id)
+            user_role_names = [role.name for role in user_with_roles.roles]
+
+            # 设置缓存
+            roles_data = [{"id": str(role.id), "name": role.name} for role in user_with_roles.roles]
+            await cache_service.set_user_roles(str(user.id), roles_data)
+        else:
+            user_role_names = [role["name"] for role in user_roles]
+
+        return role in user_role_names
 
     async def can_access_resource(self, user: User, resource_id: int, action: str) -> bool:
         """检查用户是否可以访问特定资源"""
