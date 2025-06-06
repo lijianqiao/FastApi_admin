@@ -8,13 +8,16 @@
 
 from uuid import UUID
 
+from advanced_alchemy.filters import LimitOffset
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.exceptions import DuplicateRecordError, RecordNotFoundError
 from app.models import Permission
+from app.models.models import Role, User
 from app.repositories import PermissionRepository, RoleRepository, UserRepository
 from app.schemas import (
-    BaseQuery,
     PagedResponse,
     PermissionCreate,
     PermissionResponse,
@@ -247,25 +250,55 @@ class PermissionService(AppBaseService[Permission, UUID]):
         Returns:
             分页的权限列表
         """
-        logger.info(f"获取权限列表: skip={skip}, limit={limit}")
-
-        # 构建分页参数
-        pagination = BaseQuery(
-            page=skip // limit + 1, size=limit, sort_by="created_at", sort_desc=True, include_deleted=include_deleted
+        logger.info(
+            f"获取权限列表: skip={skip}, limit={limit}, resource={resource}, action={action}, keyword={keyword}"
         )
 
-        # 使用基础服务的分页功能
-        result = await self.list_records_paginated(pagination, include_deleted=include_deleted)
+        # 构建筛选条件
+        filters = []
+
+        # 资源筛选
+        if resource:
+            from advanced_alchemy.filters import CollectionFilter
+
+            filters.append(CollectionFilter(field_name="resource", values=[resource]))
+
+        # 操作筛选
+        if action:
+            from advanced_alchemy.filters import CollectionFilter
+
+            filters.append(CollectionFilter(field_name="action", values=[action]))
+
+        # 关键词搜索（搜索名称、描述、代码字段）
+        if keyword:
+            from advanced_alchemy.filters import SearchFilter
+
+            filters.append(SearchFilter(field_name="name", value=keyword, ignore_case=True))
+
+        # 获取总数
+        total = await self.repository.count_records(*filters, include_deleted=include_deleted)
+
+        # 获取分页数据
+        offset = skip
+
+        filters.append(LimitOffset(limit=limit, offset=offset))
+
+        # 使用预加载优化的方法获取权限列表
+        records = await self.permission_repo.list_with_roles(*filters, include_deleted=include_deleted)
+
+        # 计算页数
+        pages = (total + limit - 1) // limit if total > 0 else 0
+        current_page = skip // limit + 1
 
         # 转换为权限响应模型
-        permission_responses = [PermissionResponse.model_validate(p) for p in result.items]
+        permission_responses = [PermissionResponse.model_validate(p) for p in records]
 
         return PagedResponse[PermissionResponse](
             items=permission_responses,
-            total=result.total,
-            page=result.page,
-            size=result.size,
-            pages=result.pages,
+            total=total,
+            page=current_page,
+            size=limit,
+            pages=pages,
         )
 
     async def check_permission_exists(self, permission_id: UUID) -> bool:
@@ -407,7 +440,8 @@ class PermissionService(AppBaseService[Permission, UUID]):
         """
         logger.info(f"获取权限 {permission_id} 的角色信息")
 
-        permission = await self.permission_repo.get_by_id(permission_id)
+        # 使用预加载优化方法避免N+1查询
+        permission = await self.permission_repo.get_with_roles(permission_id)
         if not permission:
             raise RecordNotFoundError(f"权限不存在: {permission_id}")
 
@@ -577,8 +611,7 @@ class PermissionService(AppBaseService[Permission, UUID]):
             for permission_id, role_ids in permission_role_mapping.items():
                 updated_permission = await self.assign_permission_to_roles(permission_id, role_ids, updated_by)
                 updated_permissions.append(updated_permission)
-
-        logger.info(f"批量权限分配成功: {len(updated_permissions)} 个权限")
+                logger.info(f"批量权限分配成功: {len(updated_permissions)} 个权限")
         return updated_permissions
 
     async def get_roles_by_permission(self, permission_id: UUID) -> list[UUID]:
@@ -602,7 +635,7 @@ class PermissionService(AppBaseService[Permission, UUID]):
         return [role.id for role in permission.roles]
 
     async def get_user_permissions(self, user_id: UUID) -> list[PermissionResponse]:
-        """获取用户的所有权限（通过角色）
+        """获取用户的所有权限（通过角色）- 优化版本
 
         Args:
             user_id: 用户ID
@@ -615,20 +648,22 @@ class PermissionService(AppBaseService[Permission, UUID]):
         """
         logger.info(f"获取用户 {user_id} 的权限列表")
 
-        # 获取用户信息
-        user = await self.user_repo.get_by_id(user_id)
+        # 使用优化的预加载查询
+        query = select(User).where(User.id == user_id).options(selectinload(User.roles).selectinload(Role.permissions))
+
+        result = await self.session.execute(query)
+        user = result.scalar_one_or_none()
+
         if not user:
             raise RecordNotFoundError(f"用户不存在: {user_id}")
 
-        # 收集用户所有角色的权限
-        user_permissions = []
-        permission_ids_seen = set()  # 用于去重
-
+        # 快速去重并收集权限
+        user_permissions = {}
         for role in user.roles:
             for permission in role.permissions:
-                if permission.id not in permission_ids_seen:
-                    user_permissions.append(permission)
-                    permission_ids_seen.add(permission.id)
+                if not permission.is_deleted:  # 过滤已删除的权限
+                    user_permissions[permission.id] = permission
 
-        logger.info(f"用户 {user_id} 共有 {len(user_permissions)} 个权限")
-        return [PermissionResponse.model_validate(p) for p in user_permissions]
+        permissions_list = list(user_permissions.values())
+        logger.info(f"用户 {user_id} 共有 {len(permissions_list)} 个权限")
+        return [PermissionResponse.model_validate(p) for p in permissions_list]

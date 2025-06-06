@@ -21,6 +21,7 @@ from app.schemas.schemas import (
     RefreshTokenRequest,
     TokenResponse,
     UserInfo,
+    UserPasswordChange,
 )
 from app.services.services import ServiceFactory, get_service_factory
 
@@ -218,3 +219,35 @@ async def check_auth_status(
         return {
             "authenticated": False,
         }
+
+
+@router.post(
+    "/change-password",
+    response_model=LogoutResponse,
+    summary="修改密码",
+    description="用户修改登录密码",
+)
+async def change_password(
+    password_data: UserPasswordChange,
+    current_user: Annotated[User, Depends(get_current_user)],
+    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+) -> LogoutResponse:
+    """
+    修改密码
+
+    - **old_password**: 旧密码
+    - **new_password**: 新密码
+    """
+    try:
+        auth_service = service_factory.get_auth_service()
+        result = await auth_service.change_password(
+            user_id=current_user.id,
+            old_password=password_data.old_password,
+            new_password=password_data.new_password,
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e

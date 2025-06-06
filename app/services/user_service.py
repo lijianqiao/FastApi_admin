@@ -226,7 +226,8 @@ class UserService(AppBaseService[User, UUID]):
             RecordNotFoundError: 当用户不存在时
         """
         try:
-            user = await self.get_record_by_id(user_id)
+            # 使用预加载优化的方法获取用户及其角色
+            user = await self.user_repo.get_with_roles(user_id)
             if not user:
                 raise RecordNotFoundError("用户不存在")
 
@@ -279,13 +280,12 @@ class UserService(AppBaseService[User, UUID]):
             query: 查询参数
 
         Returns:
-            活跃用户列表和总数
-
-        Raises:
+            活跃用户列表和总数        Raises:
             ValidationError: 当查询参数无效时
         """
         try:
-            users, total = await self.user_repo.get_active_users(
+            users, total = await self.user_repo.search_users(
+                is_active=True,
                 page=query.page,
                 page_size=query.size,
                 sort_by=query.sort_by or "created_at",
@@ -504,17 +504,63 @@ class UserService(AppBaseService[User, UUID]):
         """
         try:
             return not await self.user_repo.check_email_exists(email, exclude_user_id)
-
         except Exception as e:
             self.logger.error(f"检查邮箱可用性失败: {email} - {e}")
             return False
 
     async def get_user_roles(self, user_id: UUID) -> UserWithRoles:
-        """获取用户的所有角色信息"""
+        """获取用户的所有角色信息（优化版 - 预加载角色关系）"""
         self.logger.info(f"获取用户 {user_id} 的角色信息")
 
-        user_orm = await self.user_repo.get_by_id(user_id)
+        # 使用预加载优化的方法获取用户及其角色
+        user_orm = await self.user_repo.get_with_roles(user_id)
         if not user_orm:
             raise RecordNotFoundError(resource="用户", resource_id=user_id)
 
         return UserWithRoles.model_validate(user_orm)
+
+    @audit_log(action="LIST", resource="UserWithRoles")
+    async def list_users_with_roles(self, query: UserQuery) -> tuple[Sequence[UserWithRoles], int]:
+        """
+        获取用户列表及其角色信息
+
+        Args:
+            query: 用户查询参数
+
+        Returns:
+            用户列表（含角色）和总数
+
+        Raises:
+            ValidationError: 当查询参数无效时
+        """
+        try:
+            # 使用优化后的预加载方法，但需要使用search_users来获取分页和总数
+            users, total = await self.user_repo.search_users(
+                keyword=query.keyword,
+                is_active=query.is_active,
+                page=query.page,
+                page_size=query.size,
+                sort_by=query.sort_by or "created_at",
+                sort_desc=query.sort_desc,
+                include_deleted=False,
+            )
+
+            # 为了获取角色信息，需要重新查询带角色的用户数据
+            user_ids = [user.id for user in users]
+            if user_ids:
+                from advanced_alchemy.filters import CollectionFilter
+
+                users_with_roles = await self.user_repo.list_with_roles(
+                    CollectionFilter(field_name="id", values=user_ids),
+                    include_deleted=False,
+                )
+                # 按原顺序排列
+                user_dict = {user.id: user for user in users_with_roles}
+                users = [user_dict[user_id] for user_id in user_ids if user_id in user_dict]
+
+            user_responses = [UserWithRoles.model_validate(user) for user in users]
+            return user_responses, total
+
+        except Exception as e:
+            self.logger.error(f"获取用户及角色列表失败: {e}")
+            raise ValidationError(f"获取用户及角色列表失败: {e}") from e

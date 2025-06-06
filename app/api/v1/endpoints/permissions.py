@@ -27,9 +27,9 @@ router = APIRouter(prefix="/permissions", tags=["权限"])
 
 @router.post("/", response_model=PermissionResponse, summary="创建权限", description="创建新权限")
 async def create_permission(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    permission_data: PermissionCreate,
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        permission_data: PermissionCreate,
 ) -> PermissionResponse:
     """
     创建新权限
@@ -53,14 +53,14 @@ async def create_permission(
 
 @router.get("/", summary="权限列表", description="分页获取权限列表")
 async def list_permissions(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    skip: int = Query(0, ge=0, description="跳过数量"),
-    limit: int = Query(20, ge=1, le=100, description="每页数量"),
-    resource: str | None = Query(None, description="资源类型"),
-    action: str | None = Query(None, description="操作类型"),
-    keyword: str | None = Query(None, description="搜索关键字"),
-    include_deleted: bool = Query(False, description="是否包含已删除"),
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        skip: int = Query(0, ge=0, description="跳过数量"),
+        limit: int = Query(20, ge=1, le=100, description="每页数量"),
+        resource: str | None = Query(None, description="资源类型"),
+        action: str | None = Query(None, description="操作类型"),
+        keyword: str | None = Query(None, description="搜索关键字"),
+        include_deleted: bool = Query(False, description="是否包含已删除"),
 ) -> dict:
     """
     分页获取权限列表
@@ -84,16 +84,16 @@ async def list_permissions(
         elif isinstance(result, dict):
             return result
         else:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unexpected response type")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="意外的响应类型")
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 @router.get("/{permission_id}", response_model=PermissionResponse, summary="权限详情", description="根据ID获取权限信息")
 async def get_permission_by_id(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    permission_id: UUID,
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        permission_id: UUID,
 ) -> PermissionResponse:
     """
     根据ID获取权限信息
@@ -109,10 +109,10 @@ async def get_permission_by_id(
 
 @router.put("/{permission_id}", response_model=PermissionResponse, summary="更新权限", description="更新权限信息")
 async def update_permission(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    permission_id: UUID,
-    permission_data: PermissionUpdate,
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        permission_id: UUID,
+        permission_data: PermissionUpdate,
 ) -> PermissionResponse:
     """
     更新权限信息
@@ -137,10 +137,10 @@ async def update_permission(
 
 @router.delete("/{permission_id}", response_model=PermissionResponse, summary="删除权限", description="删除权限")
 async def delete_permission(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    permission_id: UUID,
-    hard_delete: bool = Query(False, description="是否硬删除"),
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        permission_id: UUID,
+        hard_delete: bool = Query(False, description="是否硬删除"),
 ) -> PermissionResponse:
     """
     删除权限
@@ -150,7 +150,7 @@ async def delete_permission(
     """
     try:
         permission_service = service_factory.get_permission_service()
-        return await permission_service.delete_permission(permission_id, hard_delete)
+        return await permission_service.delete_permission(permission_id, hard_delete=hard_delete)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
@@ -162,9 +162,9 @@ async def delete_permission(
     description="根据权限代码获取权限信息",
 )
 async def get_permission_by_code(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    code: str,
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        code: str,
 ) -> PermissionResponse:
     """
     根据权限代码获取权限信息
@@ -185,10 +185,10 @@ async def get_permission_by_code(
     description="根据资源和操作获取权限信息",
 )
 async def get_permission_by_resource_action(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    resource: str,
-    action: str,
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        resource: str,
+        action: str,
 ) -> PermissionResponse:
     """
     根据资源和操作获取权限信息
@@ -205,9 +205,9 @@ async def get_permission_by_resource_action(
 
 @router.get("/exists/{permission_id}", summary="检查权限是否存在", description="检查权限是否存在")
 async def check_permission_exists(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    permission_id: UUID,
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        permission_id: UUID,
 ) -> dict:
     """
     检查权限是否存在
@@ -224,10 +224,10 @@ async def check_permission_exists(
 
 @router.get("/code-exists/{code}", summary="检查权限代码是否存在", description="检查权限代码是否存在")
 async def check_permission_code_exists(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    code: str,
-    exclude_id: UUID | None = Query(None, description="排除的权限ID"),
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        code: str,
+        exclude_id: UUID | None = Query(None, description="排除的权限ID"),
 ) -> dict:
     """
     检查权限代码是否存在
@@ -245,9 +245,9 @@ async def check_permission_code_exists(
 
 @router.post("/validate-ids", summary="验证权限ID列表有效性", description="验证权限ID列表的有效性")
 async def validate_permissions(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    permission_ids: list[UUID],
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        permission_ids: list[UUID],
 ) -> dict:
     """
     验证权限ID列表的有效性
@@ -269,10 +269,10 @@ async def validate_permissions(
     description="批量更新权限状态",
 )
 async def batch_update_permission_status(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    permission_ids: list[UUID],
-    is_active: bool,
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        permission_ids: list[UUID],
+        is_active: bool,
 ) -> BatchOperationResponse:
     """
     批量更新权限状态
@@ -292,10 +292,10 @@ async def batch_update_permission_status(
 
 @router.post("/batch-delete", response_model=BatchOperationResponse, summary="批量删除权限", description="批量删除权限")
 async def batch_delete_permissions(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    permission_ids: list[UUID],
-    hard_delete: bool = False,
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        permission_ids: list[UUID],
+        hard_delete: bool = False,
 ) -> BatchOperationResponse:
     """
     批量删除权限
@@ -315,9 +315,9 @@ async def batch_delete_permissions(
 
 @router.post("/by-codes", summary="根据权限代码列表获取权限", description="根据权限代码列表获取权限")
 async def get_permissions_by_codes(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    codes: list[str],
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        codes: list[str],
 ) -> dict:
     """
     根据权限代码列表获取权限
@@ -339,9 +339,9 @@ async def get_permissions_by_codes(
     description="获取权限及其关联的角色信息",
 )
 async def get_permission_with_roles(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    permission_id: UUID,
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        permission_id: UUID,
 ) -> PermissionWithRoles:
     """
     获取权限及其关联的角色信息
@@ -362,10 +362,10 @@ async def get_permission_with_roles(
     description="给角色赋予权限",
 )
 async def assign_permission_to_roles(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    permission_id: UUID,
-    role_ids: list[UUID],
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        permission_id: UUID,
+        role_ids: list[UUID],
 ) -> PermissionWithRoles:
     """
     给角色赋予权限
@@ -387,10 +387,10 @@ async def assign_permission_to_roles(
     description="移除角色权限",
 )
 async def remove_permission_from_roles(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    permission_id: UUID,
-    role_ids: list[UUID],
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        permission_id: UUID,
+        role_ids: list[UUID],
 ) -> PermissionWithRoles:
     """
     移除角色权限
@@ -407,9 +407,9 @@ async def remove_permission_from_roles(
 
 @router.get("/by-role/{role_id}", summary="获取角色的权限列表", description="获取角色的权限列表")
 async def get_permissions_by_role(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    role_id: UUID,
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        role_id: UUID,
 ) -> dict:
     """
     获取角色的权限列表
@@ -426,10 +426,10 @@ async def get_permissions_by_role(
 
 @router.get("/role-has-permission", summary="检查角色是否具有某个权限", description="检查角色是否具有某个权限")
 async def check_role_has_permission(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    role_id: UUID,
-    permission_id: UUID,
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        role_id: UUID,
+        permission_id: UUID,
 ) -> dict:
     """
     检查角色是否具有某个权限
@@ -447,9 +447,9 @@ async def check_role_has_permission(
 
 @router.post("/batch-assign-permissions", summary="批量分配权限给角色", description="批量分配权限给角色")
 async def batch_assign_permissions_to_roles(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    permission_role_mapping: dict,
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        permission_role_mapping: dict,
 ) -> dict:
     """
     批量分配权限给角色
@@ -468,9 +468,9 @@ async def batch_assign_permissions_to_roles(
     "/{permission_id}/role-ids", summary="获取拥有指定权限的角色ID列表", description="获取拥有指定权限的角色ID列表"
 )
 async def get_roles_by_permission(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    permission_id: UUID,
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        permission_id: UUID,
 ) -> dict:
     """
     获取拥有指定权限的角色ID列表
@@ -487,9 +487,9 @@ async def get_roles_by_permission(
 
 @router.get("/user-permissions/{user_id}", summary="获取用户的所有权限", description="获取用户的所有权限（通过角色）")
 async def get_user_permissions(
-    _: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    user_id: UUID,
+        _: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        user_id: UUID,
 ) -> dict:
     """
     获取用户的所有权限（通过角色）

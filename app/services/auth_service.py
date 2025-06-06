@@ -59,7 +59,7 @@ class AuthService(AppBaseService[User, UUID]):
 
     async def _validate_and_get_user_from_token(self, access_token: str) -> User:
         """
-        验证访问令牌并返回用户对象（内部通用方法）
+        验证访问令牌并返回用户对象（内部通用方法，使用预加载优化）
 
         Args:
             access_token: 访问令牌
@@ -77,8 +77,10 @@ class AuthService(AppBaseService[User, UUID]):
         user_id = payload.get("sub")
 
         if not user_id:
-            raise InvalidTokenError("访问令牌")  # 获取用户信息
-        user = await self.user_repo.get_by_id(UUID(user_id))
+            raise InvalidTokenError("访问令牌")
+
+        # 使用预加载优化获取用户信息（包含角色和权限）
+        user = await self.user_repo.get_with_roles(UUID(user_id))
 
         if not user:
             self.logger.warning(f"令牌验证失败: 用户不存在 - {user_id}")
@@ -366,7 +368,7 @@ class AuthService(AppBaseService[User, UUID]):
             self.logger.error(f"登出异常: {e}")
             raise AuthenticationError("登出失败") from e
 
-    async def change_password(self, user_id: UUID, old_password: str, new_password: str) -> bool:
+    async def change_password(self, user_id: UUID, old_password: str, new_password: str) -> LogoutResponse:
         """
         修改用户密码
 
@@ -376,7 +378,7 @@ class AuthService(AppBaseService[User, UUID]):
             new_password: 新密码
 
         Returns:
-            修改是否成功
+            修改密码响应
 
         Raises:
             AuthenticationError: 认证失败
@@ -398,9 +400,7 @@ class AuthService(AppBaseService[User, UUID]):
             # 验证旧密码
             if not verify_password(old_password, user.password_hash):
                 self.logger.warning(f"修改密码失败: 旧密码错误 - {user.username}")
-                raise AuthenticationError("旧密码错误")
-
-            # 生成新密码哈希
+                raise AuthenticationError("旧密码错误")  # 生成新密码哈希
             new_password_hash = get_password_hash(new_password)
 
             # 更新密码
@@ -408,7 +408,7 @@ class AuthService(AppBaseService[User, UUID]):
             await self.session.commit()
 
             self.logger.info(f"密码修改成功: {user.username}")
-            return True
+            return LogoutResponse(message="密码修改成功", success=True)
 
         except Exception as e:
             await self.session.rollback()
@@ -449,6 +449,29 @@ class AuthService(AppBaseService[User, UUID]):
             self.logger.error(f"查找用户异常: {e}")
             return None
 
+    async def _get_user_by_identifier_with_roles(self, identifier: str) -> User | None:
+        """
+        根据标识符（用户名、邮箱或手机号）获取用户（预加载角色和权限）
+
+        Args:
+            identifier: 用户标识符
+
+        Returns:
+            用户对象或None
+        """
+        try:
+            # 首先找到用户ID
+            user = await self._get_user_by_identifier(identifier)
+            if not user:
+                return None
+
+            # 使用预加载方法获取完整用户信息
+            return await self.user_repo.get_with_roles(user.id)
+
+        except Exception as e:
+            self.logger.error(f"查找用户异常: {e}")
+            return None
+
     async def _update_last_login(self, user: User) -> None:
         """
         更新用户最后登录时间
@@ -480,10 +503,8 @@ class AuthService(AppBaseService[User, UUID]):
         """
         # 使用现有的login方法获取令牌
         login_request = LoginRequest(identifier=identifier, password=password, remember_me=remember_me)
-        token_response = await self.login(login_request)
-
-        # 获取用户信息
-        user = await self._get_user_by_identifier(identifier)
+        token_response = await self.login(login_request)  # 获取用户信息（使用预加载优化）
+        user = await self._get_user_by_identifier_with_roles(identifier)
         if not user:
             raise AuthenticationError("用户不存在")
 

@@ -145,6 +145,40 @@ class RoleService(AppBaseService[Role, UUID]):
         role_responses = [RoleResponse.model_validate(role) for role in roles_orm]
         return role_responses, total
 
+    async def list_roles_with_permissions(
+        self,
+        query: RoleQuery,
+    ) -> tuple[Sequence[RoleWithPermission], int]:
+        """获取角色列表及其权限信息（优化版 - 预加载权限关系）"""
+        self.logger.debug("服务层: 正在列出角色及权限并进行分页和筛选。")
+
+        # 首先获取分页和总数
+        roles_orm, total = await self.role_repo.search_roles(
+            keyword=query.keyword,
+            is_active=query.is_active,
+            page=query.page,
+            page_size=query.size,
+            sort_by=query.sort_by or "created_at",
+            sort_desc=query.sort_desc,
+            include_deleted=query.include_deleted,
+        )
+
+        # 为了获取权限信息，需要重新查询带权限的角色数据
+        role_ids = [role.id for role in roles_orm]
+        if role_ids:
+            from advanced_alchemy.filters import CollectionFilter
+
+            roles_with_permissions = await self.role_repo.list_with_permissions(
+                CollectionFilter(field_name="id", values=role_ids),
+                include_deleted=query.include_deleted,
+            )
+            # 按原顺序排列
+            role_dict = {role.id: role for role in roles_with_permissions}
+            roles_orm = [role_dict[role_id] for role_id in role_ids if role_id in role_dict]
+
+        role_responses = [RoleWithPermission.model_validate(role) for role in roles_orm]
+        return role_responses, total
+
     # ===================== 用户角色管理功能 =====================
 
     @audit_update(resource="Role", get_id=lambda result: str(result.role_id))
@@ -224,10 +258,11 @@ class RoleService(AppBaseService[Role, UUID]):
         return RoleWithUsers.model_validate(role_orm)
 
     async def get_role_with_permissions(self, role_id: UUID) -> RoleWithPermission:
-        """获取角色及其关联的权限信息"""
+        """获取角色及其关联的权限信息（优化版 - 预加载权限关系）"""
         self.logger.info(f"获取角色 {role_id} 的权限信息")
 
-        role_orm = await self.role_repo.get_by_id(role_id)
+        # 使用预加载优化的方法获取角色及其权限
+        role_orm = await self.role_repo.get_with_permissions(role_id)
         if not role_orm:
             raise RecordNotFoundError(resource="角色", resource_id=role_id)
 
@@ -269,9 +304,13 @@ class RoleService(AppBaseService[Role, UUID]):
 
             # 更新用户
             updated_user_orm = await self.user_repo.update_record(user_id, {})
+            if not updated_user_orm:
+                raise RecordNotFoundError(resource="用户", resource_id=user_id)
 
-        if not updated_user_orm:
+        # 使用预加载优化的方法重新获取用户及其角色信息
+        final_user_orm = await self.user_repo.get_with_roles(user_id)
+        if not final_user_orm:
             raise RecordNotFoundError(resource="用户", resource_id=user_id)
 
         self.logger.info(f"成功为用户 {user_id} 分配了 {len(role_ids)} 个角色")
-        return UserWithRoles.model_validate(updated_user_orm)
+        return UserWithRoles.model_validate(final_user_orm)
