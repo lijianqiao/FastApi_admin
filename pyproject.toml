@@ -59,6 +59,7 @@ known-first-party = ["app"]
 
 [dependency-groups]
 dev = [
+    "aiosqlite>=0.21.0",
     "httpx>=0.28.1",
     "pytest>=8.4.0",
     "pytest-asyncio>=1.0.0",

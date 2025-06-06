@@ -156,7 +156,12 @@ async def get_user_by_username(
     """
     try:
         user_service = service_factory.get_user_service()
-        return await user_service.get_user_by_username(username)
+        user = await user_service.get_user_by_username(username)
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
+        return user
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 

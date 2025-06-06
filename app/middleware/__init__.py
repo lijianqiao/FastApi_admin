@@ -6,6 +6,8 @@
 @Docs: 中间件模块初始化文件
 """
 
+import os
+
 from fastapi import FastAPI
 
 from .cors import setup_cors_middleware
@@ -21,8 +23,10 @@ def setup_middlewares(app: FastAPI) -> None:
     # 设置CORS中间件
     setup_cors_middleware(app)
 
-    # 全局限流
-    setup_ratelimiter(app)
+    # 全局限流（测试环境下禁用）
+    environment = os.getenv("ENVIRONMENT", "development")
+    if environment != "testing":
+        setup_ratelimiter(app)
 
     # 其他中间件可以在这里添加
     # setup_rate_limiting_middleware(app)
