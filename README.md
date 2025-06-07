@@ -451,8 +451,12 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ## 📧 联系方式
 
-- 项目地址: https://gitee.com/lijianqiao/fastapibase
-- 问题反馈: https://gitee.com/lijianqiao/fastapibase/issues
+- 项目地址: 
+  - Gitee: https://gitee.com/lijianqiao/FastApi_admin
+  - Github: https://github.com/lijianqiao/FastApi_admin
+- 问题反馈: 
+  - Gitee: https://gitee.com/lijianqiao/FastApi_admin/issues
+  - Github: https://github.com/lijianqiao/FastApi_admin/issues
 - 邮箱: lijianqiao2906@live.com
 
 ---
