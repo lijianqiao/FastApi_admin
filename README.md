@@ -26,16 +26,47 @@
 
 ### 1. 环境准备
 
+#### 方式一：使用 uv 包管理器（推荐）
+
+```cmd
+# 安装uv包管理器 (如果未安装)
+pip install uv
+
+# 克隆项目并进入目录
+git clone https://gitee.com/lijianqiao/fastapibase.git
+cd fastapi-base
+
+# 使用uv创建虚拟环境并安装依赖（一步到位）
+uv sync
+
+# 激活虚拟环境
+# Windows
+.venv\Scripts\activate
+# Linux/macOS  
+source .venv/bin/activate
+
+# 或者手动管理依赖
+uv venv                                  # 创建虚拟环境
+uv pip install -r requirements/dev.txt  # 安装开发依赖
+```
+
+#### 方式二：使用传统 pip
+
 ```cmd
 # 创建虚拟环境
 python -m venv .venv
 
-# 激活虚拟环境 (Windows)
+# 激活虚拟环境
+# Windows
 .venv\Scripts\activate
+# Linux/macOS
+source .venv/bin/activate
 
 # 安装依赖
 pip install -r requirements/dev.txt
 ```
+
+> **注意**: 项目已配置 `pyproject.toml`，推荐使用 `uv sync` 来管理依赖，它会自动创建虚拟环境并安装所有必要的依赖包。
 
 ### 2. Redis 配置
 
@@ -329,34 +360,45 @@ feature/*   # 功能分支
 hotfix/*    # 热修复分支
 ```
 
-## 🚀 生产部署
+### 常用开发命令
 
-### Docker部署
-
+#### uv 包管理命令
 ```cmd
-# 构建镜像
-docker build -t fastapi-base .
+# 环境管理
+uv sync                          # 同步所有依赖（创建环境+安装依赖）
+uv sync --dev                    # 同步包含开发依赖
+uv venv                          # 仅创建虚拟环境
 
-# 使用docker-compose部署
-docker-compose up -d
+# 依赖管理
+uv add package-name              # 添加运行时依赖
+uv add --dev package-name        # 添加开发依赖
+uv remove package-name           # 移除依赖
+uv pip list                      # 查看已安装包
+uv pip show package-name         # 查看包详情
+
+# 项目运行
+uv run python -m app.main        # 使用uv运行应用
+uv run pytest                    # 使用uv运行测试
+uv run ruff check app            # 使用uv运行代码检查
 ```
 
-### 环境变量配置
-```bash
-# 生产环境必需配置
-DATABASE_URL=postgresql://user:pass@host:5432/db
-REDIS_URL=redis://redis-host:6379/0
-JWT_SECRET_KEY=production-secret-key
-SECRET_KEY=app-secret-key
-ENVIRONMENT=production
-DEBUG=false
-```
+#### 应用管理命令
+```cmd
+# 启动开发服务器
+python main.py
 
-### 性能调优
-- **Gunicorn**: 多进程部署，worker数量=CPU核心数×2
-- **Redis配置**: 合理设置maxmemory和淘汰策略
-- **数据库**: 配置连接池大小和超时时间
-- **缓存策略**: 根据业务场景调整TTL时间
+# 数据库迁移
+alembic init alembic
+
+# 然后修改 alembic.ini 和 alembic\env.py 文件
+alembic revision --autogenerate -m "description"  # 生成迁移
+alembic upgrade head             # 应用最新迁移
+
+# 测试和代码质量
+pytest -v --cov=app             # 运行测试并生成覆盖率
+ruff check app                   # 代码检查
+ruff format app                  # 代码格式化
+```
 
 ## 🔧 常见问题
 
