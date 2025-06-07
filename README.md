@@ -33,7 +33,11 @@
 pip install uv
 
 # 克隆项目并进入目录
+# Gitee
 git clone https://gitee.com/lijianqiao/fastapibase.git
+
+# Github
+git clone https://github.com/lijianqiao/FastApi_admin.git
 cd fastapi-base
 
 # 使用uv创建虚拟环境并安装依赖（一步到位）
