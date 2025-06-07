@@ -6,8 +6,6 @@
 @Docs: 数据库初始化 - 创建超级管理员、基本权限、角色等（修复版）
 """
 
-import asyncio
-
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -215,7 +213,8 @@ class DatabaseInitializer:
             "is_active": True,
         }
 
-    async def clear_database(self, session: AsyncSession) -> None:
+    @staticmethod
+    async def clear_database(session: AsyncSession) -> None:
         """清空数据库所有数据
 
         Args:

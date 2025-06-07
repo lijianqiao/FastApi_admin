@@ -5,10 +5,10 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from logging.config import fileConfig
 
+from advanced_alchemy.base import UUIDAuditBase
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
-from app.db.base import UUIDAuditBase
 from app.models import models  # noqa: F401
 
 # this is the Alembic Config object, which provides
@@ -25,6 +25,7 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 target_metadata = UUIDAuditBase.metadata
+
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

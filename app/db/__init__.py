@@ -6,7 +6,8 @@
 @Docs: 数据库模块初始化 - 简化设计
 """
 
-from app.db.base import AutoIdModel, BaseModel
+from advanced_alchemy.base import BigIntAuditBase, UUIDAuditBase
+
 from app.db.session import (
     DatabaseManager,
     database_manager,
@@ -17,8 +18,8 @@ from app.db.session import (
 
 __all__ = [
     # 基础模型
-    "BaseModel",
-    "AutoIdModel",
+    "UUIDAuditBase",
+    "BigIntAuditBase",
     # 会话管理
     "get_async_session",
     "get_sqlalchemy_config",

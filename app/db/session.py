@@ -9,6 +9,7 @@
 from collections.abc import AsyncGenerator
 from functools import lru_cache
 
+from advanced_alchemy.base import UUIDAuditBase
 from advanced_alchemy.config import AsyncSessionConfig, SQLAlchemyAsyncConfig
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -126,11 +127,8 @@ class DatabaseManager:
             Exception: 创建表失败时抛出
         """
         try:
-            # 导入所有模型以确保它们被注册
-            from app.db.base import BaseModel  # noqa: F401
-
             async with self._engine.begin() as conn:
-                await conn.run_sync(BaseModel.metadata.create_all)
+                await conn.run_sync(UUIDAuditBase.metadata.create_all)
             logger.info("所有数据库表创建成功")
         except Exception as e:
             logger.error(f"创建数据库表失败: {e}", exc_info=True)
@@ -147,10 +145,8 @@ class DatabaseManager:
             raise ValueError("生产环境禁止删除所有表")
 
         try:
-            from app.db.base import BaseModel  # noqa: F401
-
             async with self._engine.begin() as conn:
-                await conn.run_sync(BaseModel.metadata.drop_all)
+                await conn.run_sync(UUIDAuditBase.metadata.drop_all)
             logger.warning("所有数据库表已删除")
         except Exception as e:
             logger.error(f"删除数据库表失败: {e}", exc_info=True)

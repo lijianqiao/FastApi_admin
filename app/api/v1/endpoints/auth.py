@@ -35,8 +35,8 @@ router = APIRouter(prefix="/auth", tags=["认证"])
     description="用户通过用户名/邮箱和密码进行登录，返回访问令牌和刷新令牌",
 )
 async def login(
-    login_data: LoginRequest,
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        login_data: LoginRequest,
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
 ) -> LoginResponse:
     """
     用户登录
@@ -67,8 +67,8 @@ async def login(
     description="兼容OAuth2标准的表单登录接口",
 )
 async def login_form(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
 ) -> LoginResponse:
     """
     OAuth2兼容的表单登录
@@ -97,8 +97,8 @@ async def login_form(
     description="使用刷新令牌获取新的访问令牌",
 )
 async def refresh_token(
-    refresh_data: RefreshTokenRequest,
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        refresh_data: RefreshTokenRequest,
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
 ) -> TokenResponse:
     """
     刷新访问令牌
@@ -125,9 +125,9 @@ async def refresh_token(
     description="用户登出，可选择是否登出所有设备",
 )
 async def logout(
-    access_token: Annotated[str, Depends(get_current_user_token)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-    logout_all_devices: bool = False,
+        access_token: Annotated[str, Depends(get_current_user_token)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        logout_all_devices: bool = False,
 ) -> LogoutResponse:
     """
     用户登出
@@ -158,8 +158,8 @@ async def logout(
     description="获取当前登录用户的详细信息，包括角色和权限",
 )
 async def get_current_user_info(
-    current_user: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        current_user: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
 ) -> UserInfo:
     """
     获取当前用户信息
@@ -170,7 +170,6 @@ async def get_current_user_info(
     - 权限列表
     """
     try:
-        # 简化处理：直接通过用户ID获取信息
         user_service = service_factory.get_user_service()
         user_with_roles = await user_service.get_user_with_roles(current_user.id)
 
@@ -202,7 +201,7 @@ async def get_current_user_info(
     description="检查当前用户的认证状态，支持可选认证",
 )
 async def check_auth_status(
-    current_user: Annotated[User | None, Depends(get_optional_user)],
+        current_user: Annotated[User | None, Depends(get_optional_user)],
 ) -> dict[str, bool | str]:
     """
     检查认证状态
@@ -228,9 +227,9 @@ async def check_auth_status(
     description="用户修改登录密码",
 )
 async def change_password(
-    password_data: UserPasswordChange,
-    current_user: Annotated[User, Depends(get_current_user)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        password_data: UserPasswordChange,
+        current_user: Annotated[User, Depends(get_current_user)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
 ) -> LogoutResponse:
     """
     修改密码

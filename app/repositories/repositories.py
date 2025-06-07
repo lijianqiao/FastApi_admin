@@ -17,7 +17,8 @@ from advanced_alchemy.filters import (
     OrderBy,
     SearchFilter,
 )
-from sqlalchemy import update
+from sqlalchemy import select, update
+from sqlalchemy.orm import selectinload
 
 from app.models import AuditLog, Permission, Role, User
 from app.repositories.base import AutoIdBaseRepository, BaseRepository
@@ -98,14 +99,14 @@ class UserRepository(BaseRepository[User]):
         return True
 
     async def search_users(
-            self,
-            keyword: str | None = None,
-            is_active: bool | None = None,
-            page: int = 1,
-            page_size: int = 20,
-            sort_by: str = "created_at",
-            sort_desc: bool = True,
-            include_deleted: bool = False,
+        self,
+        keyword: str | None = None,
+        is_active: bool | None = None,
+        page: int = 1,
+        page_size: int = 20,
+        sort_by: str = "created_at",
+        sort_desc: bool = True,
+        include_deleted: bool = False,
     ) -> tuple[Sequence[User], int]:
         """搜索用户，支持关键词和激活状态筛选。
 
@@ -165,8 +166,6 @@ class UserRepository(BaseRepository[User]):
         Returns:
             用户对象（包含角色信息）或None
         """
-        from sqlalchemy import select
-        from sqlalchemy.orm import selectinload
 
         stmt = select(User).options(selectinload(User.roles))
         stmt = stmt.where(User.id == user_id)
@@ -178,10 +177,10 @@ class UserRepository(BaseRepository[User]):
         return result.scalar_one_or_none()
 
     async def list_with_roles(
-            self,
-            *filters: FilterTypes,
-            include_deleted: bool = False,
-            auto_expunge: bool = True,
+        self,
+        *filters: FilterTypes,
+        include_deleted: bool = False,
+        auto_expunge: bool = True,
     ) -> Sequence[User]:
         """获取用户列表及其关联的角色信息（预加载优化）
 
@@ -192,17 +191,12 @@ class UserRepository(BaseRepository[User]):
         Returns:
             用户对象列表（包含角色信息）
         """
-        from sqlalchemy import select
-        from sqlalchemy.orm import selectinload
 
-        # 构建基础查询
         stmt = select(User).options(selectinload(User.roles))
 
-        # 应用软删除过滤
         if not include_deleted:
             stmt = stmt.where(~User.is_deleted)
 
-        # 应用其他过滤器
         for filter_obj in filters:
             stmt = filter_obj.append_to_statement(stmt, User)
 
@@ -257,14 +251,14 @@ class RoleRepository(BaseRepository[Role]):
         return await self.get_all_records(id_filter, include_deleted=include_deleted)
 
     async def search_roles(
-            self,
-            keyword: str | None = None,
-            is_active: bool | None = None,
-            page: int = 1,
-            page_size: int = 20,
-            sort_by: str = "created_at",
-            sort_desc: bool = True,
-            include_deleted: bool = False,
+        self,
+        keyword: str | None = None,
+        is_active: bool | None = None,
+        page: int = 1,
+        page_size: int = 20,
+        sort_by: str = "created_at",
+        sort_desc: bool = True,
+        include_deleted: bool = False,
     ) -> tuple[Sequence[Role], int]:
         """搜索角色，支持关键词（名称、描述）和激活状态筛选。
 
@@ -327,8 +321,6 @@ class RoleRepository(BaseRepository[Role]):
         Returns:
             角色对象（包含权限信息）或None
         """
-        from sqlalchemy import select
-        from sqlalchemy.orm import selectinload
 
         stmt = select(Role).options(selectinload(Role.permissions))
         stmt = stmt.where(Role.id == role_id)
@@ -340,10 +332,10 @@ class RoleRepository(BaseRepository[Role]):
         return result.scalar_one_or_none()
 
     async def list_with_permissions(
-            self,
-            *filters: FilterTypes,
-            include_deleted: bool = False,
-            auto_expunge: bool = True,
+        self,
+        *filters: FilterTypes,
+        include_deleted: bool = False,
+        auto_expunge: bool = True,
     ) -> Sequence[Role]:
         """获取角色列表及其关联的权限信息（预加载优化）
 
@@ -354,17 +346,12 @@ class RoleRepository(BaseRepository[Role]):
         Returns:
             角色对象列表（包含权限信息）
         """
-        from sqlalchemy import select
-        from sqlalchemy.orm import selectinload
 
-        # 构建基础查询
         stmt = select(Role).options(selectinload(Role.permissions))
 
-        # 应用软删除过滤
         if not include_deleted:
             stmt = stmt.where(~Role.is_deleted)
 
-        # 应用其他过滤器
         for filter_obj in filters:
             stmt = filter_obj.append_to_statement(stmt, Role)
 
@@ -405,7 +392,7 @@ class PermissionRepository(BaseRepository[Permission]):
         return True
 
     async def get_permissions_by_ids(
-            self, permission_ids: list[UUID], include_deleted: bool = False
+        self, permission_ids: list[UUID], include_deleted: bool = False
     ) -> Sequence[Permission]:
         """根据一组ID获取多个权限。
 
@@ -435,7 +422,7 @@ class PermissionRepository(BaseRepository[Permission]):
         return await self.get_all_records(code_filter, include_deleted=include_deleted)
 
     async def get_by_resource_and_action(
-            self, resource: str, action: str, include_deleted: bool = False, auto_expunge: bool = True
+        self, resource: str, action: str, include_deleted: bool = False, auto_expunge: bool = True
     ) -> Permission | None:
         """根据资源和操作获取权限。
 
@@ -465,8 +452,6 @@ class PermissionRepository(BaseRepository[Permission]):
         Returns:
             权限对象（包含角色信息）或None
         """
-        from sqlalchemy import select
-        from sqlalchemy.orm import selectinload
 
         stmt = select(Permission).options(selectinload(Permission.roles))
         stmt = stmt.where(Permission.id == permission_id)
@@ -478,10 +463,10 @@ class PermissionRepository(BaseRepository[Permission]):
         return result.scalar_one_or_none()
 
     async def list_with_roles(
-            self,
-            *filters: FilterTypes,
-            include_deleted: bool = False,
-            auto_expunge: bool = True,
+        self,
+        *filters: FilterTypes,
+        include_deleted: bool = False,
+        auto_expunge: bool = True,
     ) -> Sequence[Permission]:
         """获取权限列表及其关联的角色信息（预加载优化）
 
@@ -492,17 +477,12 @@ class PermissionRepository(BaseRepository[Permission]):
         Returns:
             权限对象列表（包含角色信息）
         """
-        from sqlalchemy import select
-        from sqlalchemy.orm import selectinload
 
-        # 构建基础查询
         stmt = select(Permission).options(selectinload(Permission.roles))
 
-        # 应用软删除过滤
         if not include_deleted:
             stmt = stmt.where(~Permission.is_deleted)
 
-        # 应用其他过滤器
         for filter_obj in filters:
             stmt = filter_obj.append_to_statement(stmt, Permission)
 
@@ -510,15 +490,15 @@ class PermissionRepository(BaseRepository[Permission]):
         return result.scalars().all()
 
     async def search_permissions(
-            self,
-            keyword: str | None = None,
-            resource: str | None = None,
-            action: str | None = None,
-            page: int = 1,
-            page_size: int = 20,
-            sort_by: str = "created_at",
-            sort_desc: bool = True,
-            include_deleted: bool = False,
+        self,
+        keyword: str | None = None,
+        resource: str | None = None,
+        action: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+        sort_by: str = "created_at",
+        sort_desc: bool = True,
+        include_deleted: bool = False,
     ) -> tuple[Sequence[Permission], int]:
         """搜索权限，支持关键词（名称、代码、描述）和条件筛选。
 
@@ -616,7 +596,7 @@ class AuditLogRepository(AutoIdBaseRepository[AuditLog]):
         return result.scalar() or 0
 
     async def count_by_date_range(
-            self, start_date: datetime | None = None, end_date: datetime | None = None, include_deleted: bool = False
+        self, start_date: datetime | None = None, end_date: datetime | None = None, include_deleted: bool = False
     ) -> int:
         """直接统计指定日期范围的日志数量
 
@@ -697,8 +677,6 @@ class AuditLogRepository(AutoIdBaseRepository[AuditLog]):
         Returns:
             审计日志对象，如果不存在则返回None
         """
-        from sqlalchemy import select
-        from sqlalchemy.orm import selectinload
 
         stmt = select(AuditLog).options(selectinload(AuditLog.user)).where(AuditLog.id == log_id)
         if not include_deleted:
@@ -708,10 +686,10 @@ class AuditLogRepository(AutoIdBaseRepository[AuditLog]):
         return result.scalar_one_or_none()
 
     async def list_with_user(
-            self,
-            *filters: FilterTypes,
-            include_deleted: bool = False,
-            auto_expunge: bool = True,
+        self,
+        *filters: FilterTypes,
+        include_deleted: bool = False,
+        auto_expunge: bool = True,
     ) -> Sequence[AuditLog]:
         """获取审计日志列表并预加载用户信息
 
@@ -723,17 +701,12 @@ class AuditLogRepository(AutoIdBaseRepository[AuditLog]):
         Returns:
             审计日志列表
         """
-        from sqlalchemy import select
-        from sqlalchemy.orm import selectinload
 
-        # 构建基础查询
         stmt = select(AuditLog).options(selectinload(AuditLog.user))
 
-        # 应用软删除过滤
         if not include_deleted:
             stmt = stmt.where(~AuditLog.is_deleted)
 
-        # 应用其他过滤器
         for filter_obj in filters:
             stmt = filter_obj.append_to_statement(stmt, AuditLog)
 

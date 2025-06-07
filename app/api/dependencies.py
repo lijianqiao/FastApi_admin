@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import decode_access_token
 from app.db.session import get_async_session
 from app.models.models import User
+from app.schemas import UserResponse
 from app.services.cache_service import cache_service
 from app.services.services import ServiceFactory, get_service_factory
 
@@ -40,10 +41,10 @@ async def get_current_user_token(credentials: Annotated[HTTPAuthorizationCredent
 
 
 async def get_current_user(
-    token: Annotated[str, Depends(get_current_user_token)],
-    session: Annotated[AsyncSession, Depends(get_async_session)],
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
-) -> User:
+        token: Annotated[str, Depends(get_current_user_token)],
+        session: Annotated[AsyncSession, Depends(get_async_session)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+) -> UserResponse:
     """
     获取当前认证用户
 
@@ -143,8 +144,8 @@ def require_permissions(*required_permissions: str) -> Callable:
     """
 
     async def check_permissions(
-        current_user: Annotated[User, Depends(get_active_user)],
-        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+            current_user: Annotated[User, Depends(get_active_user)],
+            service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
     ) -> User:
         """
         检查用户权限
@@ -203,8 +204,8 @@ def require_roles(*required_roles: str) -> Callable:
     """
 
     async def check_roles(
-        current_user: Annotated[User, Depends(get_active_user)],
-        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+            current_user: Annotated[User, Depends(get_active_user)],
+            service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
     ) -> User:
         """
         检查用户角色
@@ -262,8 +263,8 @@ def require_any_permission(*required_permissions: str) -> Callable:
     """
 
     async def check_any_permission(
-        current_user: Annotated[User, Depends(get_active_user)],
-        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+            current_user: Annotated[User, Depends(get_active_user)],
+            service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
     ) -> User:
         """
         检查用户是否拥有任一所需权限
@@ -320,8 +321,8 @@ def require_all_roles(*required_roles: str) -> Callable:
     """
 
     async def check_all_roles(
-        current_user: Annotated[User, Depends(get_active_user)],
-        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+            current_user: Annotated[User, Depends(get_active_user)],
+            service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
     ) -> User:
         """
         检查用户是否拥有所有指定角色
@@ -369,8 +370,8 @@ def require_all_roles(*required_roles: str) -> Callable:
 
 
 async def get_optional_user(
-    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer(auto_error=False)),
-    service_factory: ServiceFactory = Depends(get_service_factory),
+        credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer(auto_error=False)),
+        service_factory: ServiceFactory = Depends(get_service_factory),
 ) -> User | None:
     """
     获取可选用户（可以为空，用于公共接口）
@@ -449,13 +450,13 @@ class PermissionChecker:
 
     async def can_access_resource(self, user: User, resource_id: int, action: str) -> bool:
         """检查用户是否可以访问特定资源"""
-        # 这里可以实现更复杂的资源访问控制逻辑
+        # 这里可以扩展实现更复杂的资源访问控制逻辑
         # 例如：检查资源所有者、部门权限等
         return await self.has_permission(user, f"{action}_{resource_id}")
 
 
 async def get_permission_checker(
-    service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
+        service_factory: Annotated[ServiceFactory, Depends(get_service_factory)],
 ) -> PermissionChecker:
     """获取权限检查器实例"""
     return PermissionChecker(service_factory)

@@ -1,15 +1,11 @@
 """
-通用服务注册与聚合层
-
-用于统一注册和聚合所有具体服务，便于依赖注入和管理。
-"""
-
-"""
 @Author: li
 @Email: lijianqiao2906@live.com
 @FileName: services.py
 @DateTime: 2025/06/03
-@Docs: 应用核心服务层实现 - 服务工厂和依赖管理
+@Docs: 通用服务注册与聚合层
+
+用于统一注册和聚合所有具体服务，便于依赖注入和管理。
 """
 
 from typing import TypeVar

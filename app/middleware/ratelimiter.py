@@ -28,7 +28,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     """
 
     def __init__(
-        self, app: ASGIApp, max_requests: int = _rate_limit_num, window_seconds: int = _rate_limit_time_window
+            self, app: ASGIApp, max_requests: int = _rate_limit_num, window_seconds: int = _rate_limit_time_window
     ):
         super().__init__(app)
         self.max_requests = max_requests
@@ -54,7 +54,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 )
         return await call_next(request)
 
-    def _get_client_ip(self, request: Request) -> str:
+    @staticmethod
+    def _get_client_ip(request: Request) -> str:
         x_forwarded_for = request.headers.get("x-forwarded-for")
         if x_forwarded_for:
             return x_forwarded_for.split(",")[0].strip()

@@ -11,16 +11,16 @@ from collections.abc import Sequence
 from typing import Any, Generic, TypeVar
 from uuid import UUID
 
+from advanced_alchemy.base import BigIntAuditBase, UUIDAuditBase
 from advanced_alchemy.filters import CollectionFilter, FilterTypes
 from advanced_alchemy.repository import SQLAlchemyAsyncRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.base import AutoIdModel, BaseModel
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-ModelT = TypeVar("ModelT", bound=BaseModel | AutoIdModel)
+ModelT = TypeVar("ModelT", bound=UUIDAuditBase | BigIntAuditBase)
 IdType = TypeVar("IdType", UUID, int)  # ID类型变量，可以是UUID或int
 
 
@@ -80,7 +80,7 @@ class AbstractBaseRepository(SQLAlchemyAsyncRepository[ModelT], Generic[ModelT, 
         return await super().add(obj_in)
 
     async def get_by_id(
-        self, item_id: IdType, auto_expunge: bool = True, include_deleted: bool = False
+            self, item_id: IdType, auto_expunge: bool = True, include_deleted: bool = False
     ) -> ModelT | None:
         """
         通过ID获取单个记录。
@@ -97,11 +97,11 @@ class AbstractBaseRepository(SQLAlchemyAsyncRepository[ModelT], Generic[ModelT, 
         return await super().get_one_or_none(*processed_filters, auto_expunge=auto_expunge)
 
     async def get_one_by_field(
-        self,
-        field_name: str,
-        value: Any,
-        auto_expunge: bool = True,
-        include_deleted: bool = False,
+            self,
+            field_name: str,
+            value: Any,
+            auto_expunge: bool = True,
+            include_deleted: bool = False,
     ) -> ModelT | None:
         """
         根据指定字段和值获取单个记录。
@@ -124,10 +124,10 @@ class AbstractBaseRepository(SQLAlchemyAsyncRepository[ModelT], Generic[ModelT, 
         return await super().get_one_or_none(*processed_filters, auto_expunge=auto_expunge)
 
     async def get_all_records(
-        self,
-        *filters: FilterTypes,  # 接收可变数量的位置参数作为过滤器
-        include_deleted: bool = False,
-        auto_expunge: bool = True,
+            self,
+            *filters: FilterTypes,  # 接收可变数量的位置参数作为过滤器
+            include_deleted: bool = False,
+            auto_expunge: bool = True,
     ) -> Sequence[ModelT]:
         """
         获取所有符合条件的记录。
@@ -144,12 +144,12 @@ class AbstractBaseRepository(SQLAlchemyAsyncRepository[ModelT], Generic[ModelT, 
         return await super().list(*processed_filters, auto_expunge=auto_expunge)
 
     async def get_all_by_field(
-        self,
-        field_name: str,
-        value: Any,
-        include_deleted: bool = False,
-        auto_expunge: bool = True,
-        other_filters: Sequence[FilterTypes] | None = None,  # 明确的关键字参数
+            self,
+            field_name: str,
+            value: Any,
+            include_deleted: bool = False,
+            auto_expunge: bool = True,
+            other_filters: Sequence[FilterTypes] | None = None,  # 明确的关键字参数
     ) -> Sequence[ModelT]:
         """
         根据指定字段和值获取所有匹配的记录，可附加其他过滤器。
@@ -254,8 +254,8 @@ class AbstractBaseRepository(SQLAlchemyAsyncRepository[ModelT], Generic[ModelT, 
 
 
 # 定义具体的Repository类型
-UUIDModelT = TypeVar("UUIDModelT", bound=BaseModel)
-AutoIdModelT = TypeVar("AutoIdModelT", bound=AutoIdModel)
+UUIDModelT = TypeVar("UUIDModelT", bound=UUIDAuditBase)
+BigIntAuditBaseT = TypeVar("BigIntAuditBaseT", bound=BigIntAuditBase)
 
 
 class BaseRepository(AbstractBaseRepository[UUIDModelT, UUID], Generic[UUIDModelT]):
@@ -268,7 +268,7 @@ class BaseRepository(AbstractBaseRepository[UUIDModelT, UUID], Generic[UUIDModel
     pass
 
 
-class AutoIdBaseRepository(AbstractBaseRepository[AutoIdModelT, int], Generic[AutoIdModelT]):
+class AutoIdBaseRepository(AbstractBaseRepository[BigIntAuditBaseT, int], Generic[BigIntAuditBaseT]):
     """
     自增ID Repository类，适用于自增整数ID并支持审计字段的模型。
 

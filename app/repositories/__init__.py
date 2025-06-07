@@ -9,26 +9,26 @@
 from .base import (
     AbstractBaseRepository,
     AutoIdBaseRepository,
-    AutoIdModel,
-    AutoIdModelT,
-    BaseModel,
     BaseRepository,
+    BigIntAuditBase,
+    BigIntAuditBaseT,
     IdType,
     ModelT,
+    UUIDAuditBase,
     UUIDModelT,
 )
 from .repositories import AuditLogRepository, PermissionRepository, RoleRepository, UserRepository
 
 __all__ = [
-    "BaseModel",
-    "AutoIdModel",
+    "UUIDAuditBase",
+    "BigIntAuditBase",
     "AbstractBaseRepository",
     "BaseRepository",
     "AutoIdBaseRepository",
     "UUIDModelT",
     "ModelT",
     "IdType",
-    "AutoIdModelT",
+    "BigIntAuditBaseT",
     "UserRepository",
     "RoleRepository",
     "PermissionRepository",

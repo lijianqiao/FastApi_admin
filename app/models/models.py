@@ -8,15 +8,14 @@
 
 from datetime import datetime
 
+from advanced_alchemy.base import BigIntAuditBase, UUIDAuditBase
 from sqlalchemy import Boolean, Column, ForeignKey, Index, String, Table, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from app.db.base import AutoIdModel, BaseModel
 
 # 用户角色关联表
 user_roles = Table(
     "user_roles",
-    BaseModel.metadata,
+    UUIDAuditBase.metadata,
     Column("user_id", ForeignKey("users.id"), primary_key=True),
     Column("role_id", ForeignKey("roles.id"), primary_key=True),
     # 添加复合索引优化查询
@@ -27,7 +26,7 @@ user_roles = Table(
 # 角色权限关联表
 role_permissions = Table(
     "role_permissions",
-    BaseModel.metadata,
+    UUIDAuditBase.metadata,
     Column("role_id", ForeignKey("roles.id"), primary_key=True),
     Column("permission_id", ForeignKey("permissions.id"), primary_key=True),
     # 添加复合索引优化查询
@@ -36,7 +35,7 @@ role_permissions = Table(
 )
 
 
-class User(BaseModel):
+class User(UUIDAuditBase):
     """用户模型"""
 
     __tablename__ = "users"
@@ -69,7 +68,7 @@ class User(BaseModel):
     )
 
 
-class Role(BaseModel):
+class Role(UUIDAuditBase):
     """角色模型"""
 
     __tablename__ = "roles"
@@ -92,7 +91,7 @@ class Role(BaseModel):
     )
 
 
-class Permission(BaseModel):
+class Permission(UUIDAuditBase):
     """权限模型"""
 
     __tablename__ = "permissions"
@@ -118,7 +117,7 @@ class Permission(BaseModel):
     )
 
 
-class AuditLog(AutoIdModel):
+class AuditLog(BigIntAuditBase):
     """审计日志模型"""
 
     __tablename__ = "audit_logs"

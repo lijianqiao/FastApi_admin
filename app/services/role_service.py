@@ -46,16 +46,13 @@ class RoleService(AppBaseService[Role, UUID]):
     def __init__(self, session: AsyncSession):
         super().__init__(session)
         self.role_repo: RoleRepository = self.repository  # type: ignore
-        # 角色服务在分配权限时需要 PermissionRepository
         self.permission_repo = PermissionRepository(session=self.session)
-        # 角色服务在管理用户角色时需要 UserRepository
         self.user_repo = UserRepository(session=self.session)
 
     @audit_create(resource="Role", get_id=get_role_id)
     async def create_role(
         self,
         role_data: RoleCreate,
-        # current_user_for_audit: User, # 操作者，用于审计日志，由API层注入
     ) -> RoleResponse:
         """创建新角色"""
         self.logger.info(f"尝试创建新角色: {role_data.name}")
@@ -64,7 +61,7 @@ class RoleService(AppBaseService[Role, UUID]):
             raise DuplicateRecordError(resource="角色", field="name", value=role_data.name)
 
         new_role_orm = Role(**role_data.model_dump())
-        async with self.transaction():  # 使用事务确保原子性
+        async with self.transaction():
             created_role_orm = await self.role_repo.create_record(new_role_orm)
 
         self.logger.info(f"角色 {created_role_orm.name} (ID: {created_role_orm.id}) 创建成功。")
@@ -73,7 +70,7 @@ class RoleService(AppBaseService[Role, UUID]):
     async def get_role_by_id(self, role_id: UUID, include_deleted: bool = False) -> RoleResponse:
         """根据ID获取角色信息"""
         role_orm = await self.get_record_by_id(role_id, include_deleted=include_deleted)
-        # 基类 get_record_by_id 已处理 NotFoundError (抛出HTTPException)
+
         if not isinstance(role_orm, Role):  # 防御性检查
             raise RecordNotFoundError(resource="角色", resource_id=role_id)
         return RoleResponse.model_validate(role_orm)
@@ -83,11 +80,10 @@ class RoleService(AppBaseService[Role, UUID]):
         self,
         role_id: UUID,
         role_data: RoleUpdate,
-        # current_user_for_audit: User,
     ) -> RoleResponse:
         """更新现有角色"""
         self.logger.info(f"尝试更新角色 {role_id}。")
-        db_role_orm = await self.role_repo.get_by_id(role_id)  # 获取原始ORM对象
+        db_role_orm = await self.role_repo.get_by_id(role_id)
         if not db_role_orm:
             raise RecordNotFoundError(resource="角色", resource_id=role_id)
 
@@ -97,14 +93,14 @@ class RoleService(AppBaseService[Role, UUID]):
                 raise DuplicateRecordError(resource="角色", field="name", value=role_data.name)
 
         update_data_dict = role_data.model_dump(exclude_unset=True)
-        if not update_data_dict:  # 如果没有实际要更新的字段
+        if not update_data_dict:
             self.logger.info(f"角色 {role_id} 无更新内容。")
             return RoleResponse.model_validate(db_role_orm)
 
         async with self.transaction():
             updated_role_orm = await self.role_repo.update_record(role_id, update_data_dict)
         if not updated_role_orm:
-            raise RecordNotFoundError(resource="角色", resource_id=role_id)  # 理论上不会执行
+            raise RecordNotFoundError(resource="角色", resource_id=role_id)
         self.logger.info(f"角色 {updated_role_orm.name} (ID: {role_id}) 更新成功。")
 
         # 清理角色相关缓存
@@ -131,11 +127,9 @@ class RoleService(AppBaseService[Role, UUID]):
             user_ids = [user.id for user in role_orm.users]
 
         async with self.transaction():
-            # 调用基类的 delete_record_svc，它会返回被删除的 ORM 对象 (或软删除后的对象)
-            # commit=False 因为外层有 transaction 管理器
             deleted_role_orm = await self.delete_record_svc(role_id, hard_delete=hard_delete, commit=False)
 
-        if not deleted_role_orm:  # 基类 delete_record_svc 在找不到时会抛出 HTTPException(404)
+        if not deleted_role_orm:
             raise RecordNotFoundError(resource="角色", resource_id=role_id)
 
         # 清理角色相关缓存
@@ -208,7 +202,6 @@ class RoleService(AppBaseService[Role, UUID]):
         self,
         role_id: UUID,
         user_ids: list[UUID],
-        # current_user_for_audit: User,
     ) -> RoleWithUsers:
         """为角色分配用户"""
         self.logger.info(f"尝试为角色 {role_id} 分配用户: {user_ids}")
@@ -256,7 +249,6 @@ class RoleService(AppBaseService[Role, UUID]):
         self,
         role_id: UUID,
         user_ids: list[UUID],
-        # current_user_for_audit: User,
     ) -> RoleWithUsers:
         """从角色移除用户"""
         self.logger.info(f"尝试从角色 {role_id} 移除用户: {user_ids}")
