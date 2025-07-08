@@ -530,11 +530,6 @@ class PermissionService(AppBaseService[Permission, UUID]):
         """
         logger.info(f"为权限 {permission_id} 分配角色: {role_ids}")
 
-        # 检查权限是否存在
-        permission = await self.permission_repo.get_by_id(permission_id)
-        if not permission:
-            raise RecordNotFoundError(f"权限不存在: {permission_id}")
-
         # 验证角色是否存在
         if role_ids:
             roles = await self.role_repo.get_roles_by_ids(role_ids)
@@ -545,17 +540,21 @@ class PermissionService(AppBaseService[Permission, UUID]):
 
         # 使用事务更新权限的角色关联
         async with self.transaction():
-            # 获取新的角色对象列表
+            # 直接用 self.session.get 查询，避免 repository 方法签名变更
+            permission = await self.session.get(Permission, permission_id)
+            if not permission:
+                raise RecordNotFoundError(f"权限不存在: {permission_id}")
+
             new_roles = []
             for role_id in role_ids:
-                role = await self.role_repo.get_by_id(role_id)
+                role = await self.session.get(Role, role_id)
                 if role:
                     new_roles.append(role)
 
-            # 替换权限的角色关联
             permission.roles = new_roles
-            # 保存更改
-            await self.session.commit()  # 重新获取更新后的权限
+            self.session.add(permission)
+            await self.session.commit()
+
         updated_permission = await self.permission_repo.get_by_id(permission_id)
         if not updated_permission:
             raise RecordNotFoundError(f"权限不存在: {permission_id}")
@@ -593,17 +592,16 @@ class PermissionService(AppBaseService[Permission, UUID]):
         """
         logger.info(f"从权限 {permission_id} 移除角色: {role_ids}")
 
-        # 检查权限是否存在
-        permission = await self.permission_repo.get_by_id(permission_id)
-        if not permission:
-            raise RecordNotFoundError(f"权限不存在: {permission_id}")
 
         # 使用事务更新权限的角色关联
         async with self.transaction():
-            # 移除指定的角色
+            permission = await self.session.get(Permission, permission_id)
+            if not permission:
+                raise RecordNotFoundError(f"权限不存在: {permission_id}")
+
             permission.roles = [role for role in permission.roles if role.id not in role_ids]
-            # 保存更改
-            await self.session.commit()  # 重新获取更新后的权限
+            self.session.add(permission)
+            await self.session.commit()
         updated_permission = await self.permission_repo.get_by_id(permission_id)
         if not updated_permission:
             raise RecordNotFoundError(f"权限不存在: {permission_id}")
