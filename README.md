@@ -52,8 +52,8 @@ uv sync
 # 配置环境变量
 cp .env.example .env
 
-# 初始化权限系统
-uv run python scripts/permission_init.py
+# 初始化管理员用户、角色、权限 (环境变量文件可以修改初始化管理员账户的相关信息)
+uv run python manage_db.py init
 
 # 运行应用
 uv run python start.py
