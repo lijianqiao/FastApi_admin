@@ -2,415 +2,366 @@
 @Author: li
 @Email: lijianqiao2906@live.com
 @FileName: base.py
-@DateTime: 2025/06/03
-@Docs: 服务层基类 - 专注业务逻辑，分页和事务管理
+@DateTime: 2025/07/05
+@Docs: 基础服务类
 """
 
-import logging
-from abc import ABC
-from collections.abc import Sequence
-from contextlib import asynccontextmanager
-from typing import Any, Generic
+from typing import Any, TypeVar
+from uuid import UUID
 
-from advanced_alchemy.filters import FilterTypes
-from fastapi import HTTPException, status
-from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import HTTPException
+from tortoise.exceptions import DoesNotExist
 
-from app.exceptions import database_exception_handler
-from app.repositories import AbstractBaseRepository, IdType, ModelT
-from app.schemas.schemas import BaseQuery, PagedResponse
-from app.utils.logger import get_logger
+from app.core.exceptions import VersionConflictError
+from app.dao.base import BaseDAO
+from app.models.base import BaseModel
+from app.schemas.types import ModelDict
+from app.utils.deps import OperationContext
+
+# 定义泛型类型变量
+T = TypeVar("T", bound=BaseModel)
 
 
-class AppBaseService(Generic[ModelT, IdType], ABC):
+class BaseService[T: BaseModel]:
     """
-    应用服务层基类。
-    提供分页、事务管理等企业级功能，专注业务逻辑。
+    基础服务类，使用DAO层进行数据操作，并提供钩子函数。
+
+    钩子函数 (Hooks):
+    - 单个对象操作:
+        - `before_create(data)`: 在创建对象之前调用。
+        - `after_create(obj)`: 在创建对象之后调用。
+        - `before_update(obj, data)`: 在更新对象之前调用。
+        - `after_update(obj)`: 在更新对象之后调用。
+    - 批量操作:
+        - `before_bulk_create(data_list)`: 在批量创建之前调用。
+        - `after_bulk_create(obj_list)`: 在批量创建之后调用。
+        - `before_bulk_update(update_list)`: 在批量更新之前调用。
+        - `before_update_by_filter(filters, data)`: 在按条件更新之前调用。
+
+    注意：为了保持高性能，批量更新操作 (`bulk_update`, `update_by_filter`)
+    不提供 `after` 钩子，因为这些操作通常不会返回更新后的对象列表。
     """
 
-    # 子类必须定义的属性
-    repository_type: type[AbstractBaseRepository[ModelT, IdType]]
-
-    # 可选的 Pydantic 模型定义
-    create_schema: type[BaseModel] | None = None
-    update_schema: type[BaseModel] | None = None
-    response_schema: type[BaseModel] | None = None
-
-    def __init__(self, session: AsyncSession):
+    def __init__(self, dao: BaseDAO[T]):
         """
-        初始化服务。
+        初始化服务，接受具体的DAO实例
 
         Args:
-            session: SQLAlchemy 异步会话实例。
+            dao: 具体的DAO实例（如UserDAO、RoleDAO等）
         """
-        self.session: AsyncSession = session
-        self.logger: logging.Logger = get_logger(self.__class__.__name__)
+        self.dao = dao
+        self.model = dao.model
 
-        if not hasattr(self, "repository_type") or self.repository_type is None:
-            self.logger.error(f"服务 {self.__class__.__name__} 必须定义 'repository_type' 属性。")
-            raise AttributeError(
-                f"服务 {self.__class__.__name__} 必须定义 'repository_type' 属性，"
-                f"指向一个继承自 AbstractBaseRepository 的 Repository 类。"
-            )
+    # ------------------- 钩子函数 (Hooks) -------------------
+    async def before_create(self, data: ModelDict) -> ModelDict:
+        """创建对象前的钩子函数"""
+        return data
 
-        self.repository: AbstractBaseRepository[ModelT, IdType] = self.repository_type(session=self.session)
-        self.logger.info(f"服务 {self.__class__.__name__} 已初始化，使用仓库 {self.repository.__class__.__name__}")
+    async def after_create(self, obj: T) -> None:
+        """创建对象后的钩子函数"""
+        pass
 
-    # ==================== 基础 CRUD 操作 ====================
-    async def get_record_by_id(self, item_id: IdType, include_deleted: bool = False) -> ModelT | None:
+    async def before_update(self, obj: T, data: ModelDict) -> ModelDict:
+        """更新对象前的钩子函数"""
+        return data
+
+    async def after_update(self, obj: T) -> None:
+        """更新对象后的钩子函数"""
+        pass
+
+    async def before_bulk_create(self, objects_data: list[ModelDict]) -> list[ModelDict]:
+        """批量创建前的钩子函数"""
+        return objects_data
+
+    async def after_bulk_create(self, objects: list[T]) -> None:
+        """批量创建后的钩子函数"""
+        pass
+
+    async def before_bulk_update(self, updates: list[ModelDict]) -> list[ModelDict]:
+        """批量更新前的钩子函数"""
+        return updates
+
+    async def before_update_by_filter(self, filters: ModelDict, data: ModelDict) -> tuple[ModelDict, ModelDict]:
+        """按条件更新前的钩子函数"""
+        return filters, data
+
+    # ------------------- CRUD基础操作 -------------------
+    async def get_by_id(self, id: UUID) -> T | None:
+        """根据ID获取单个对象"""
+        return await self.dao.get_by_id(id)
+
+    async def get_by_ids(self, ids: list[UUID]) -> list[T]:
+        """根据ID列表批量获取对象"""
+        return await self.dao.get_by_ids(ids)
+
+    async def get_one(self, **filters) -> T | None:
+        """根据条件获取单个对象"""
+        return await self.dao.get_one(**filters)
+
+    async def get_all(self, **filters) -> list[T]:
+        """获取所有对象"""
+        return await self.dao.get_all(**filters)
+
+    async def exists(self, **filters) -> bool:
+        """检查对象是否存在"""
+        return await self.dao.exists(**filters)
+
+    async def count(self, **filters) -> int:
+        """获取对象数量"""
+        return await self.dao.count(**filters)
+
+    async def create(self, operation_context: OperationContext, **data) -> T | None:
+        """创建对象，并触发 pre/post 钩子"""
+        processed_data = await self.before_create(data)
+        obj = await self.dao.create(**processed_data)
+        if obj:
+            await self.after_create(obj)
+        return obj
+
+    async def bulk_create(self, objects_data: list[dict[str, Any]]) -> list[T]:
+        """批量创建对象，并触发钩子"""
+        processed_data = await self.before_bulk_create(objects_data)
+        objects = await self.dao.bulk_create(processed_data)
+        if objects:
+            await self.after_bulk_create(objects)
+        return objects
+
+    async def update(self, id: UUID, operation_context: OperationContext, **data) -> T | None:
         """
-        通过ID获取单个记录。
-
-        Args:
-            item_id: 记录ID
-            include_deleted: 是否包含已删除的记录
+        更新对象，并触发 pre/post 钩子。
+        此方法现在集成了乐观锁。
         """
-        self.logger.debug(f"服务层: 正在通过 ID {item_id} 获取 {self.repository.model_type.__name__}...")
+        version = data.pop("version", None)
+        if version is None:
+            raise HTTPException(status_code=400, detail="更新请求必须包含 version 字段以进行乐观锁校验。")
 
-        record = await self.repository.get_by_id(item_id, include_deleted=include_deleted)
+        obj = await self.dao.get_by_id(id)
+        if not obj:
+            return None
 
-        if not record:
+        # 预检查：提前拦截掉版本不匹配的请求
+        if obj.version != version:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"{self.repository.model_type.__name__} 未找到"
+                status_code=409,  # 409 Conflict 是最适合此场景的状态码
+                detail=f"数据版本已过期，服务器当前版本为 {obj.version}，您提交的版本为 {version}。请刷新后重试。",
             )
 
-        return record
+        # 执行 before 钩子
+        processed_data = await self.before_update(obj, data)
 
-    async def create_record_svc(self, data: BaseModel | dict[str, Any], commit: bool = True) -> ModelT:
-        """
-        创建新的记录。
+        try:
+            # 调用新的、带乐观锁的DAO方法
+            updated_obj = await self.dao.update_with_optimistic_lock(obj, processed_data)
+        except VersionConflictError as e:
+            # 捕获DAO层抛出的版本冲突异常
+            raise HTTPException(status_code=409, detail=str(e)) from e
+        except DoesNotExist as e:
+            # 捕获对象可能已被物理删除的异常
+            raise HTTPException(status_code=404, detail=str(e)) from e
 
-        Args:
-            data: 创建数据
-            commit: 是否自动提交事务
-        """
-        self.logger.debug(f"服务层: 正在创建 {self.repository.model_type.__name__} 记录...")
+        # 执行 after 钩子
+        if updated_obj:
+            await self.after_update(updated_obj)
 
-        # 数据校验
-        validated_data = await self._validate_create_data(data)
+        return updated_obj
 
-        # 业务逻辑验证（子类可重写）
-        await self._before_create(validated_data)
+    async def bulk_update(self, updates: list[dict[str, Any]], id_field: str = "id") -> int:
+        """批量更新对象，并触发 before 钩子"""
+        processed_updates = await self.before_bulk_update(updates)
+        return await self.dao.bulk_update(processed_updates, id_field)
 
-        # 创建记录
-        record = await self.repository.create_record(validated_data)
+    async def update_by_filter(self, filters: dict[str, Any], **data) -> int:
+        """根据条件批量更新，并触发 before 钩子"""
+        processed_filters, processed_data = await self.before_update_by_filter(filters, data)
+        return await self.dao.update_by_filter(processed_filters, **processed_data)
 
-        if commit:
-            await self.session.commit()
-            await self.session.refresh(record)
+    async def delete(self, id: UUID, operation_context: OperationContext) -> bool:
+        """删除对象（默认软删除）"""
+        return await self.dao.delete_by_id(id)
 
-        # 创建后处理（子类可重写）
-        await self._after_create(record)
+    async def delete_by_ids(self, ids: list[UUID], operation_context: OperationContext) -> int:
+        """批量删除对象（默认软删除）"""
+        return await self.dao.delete_by_ids(ids)
 
-        return record
+    async def delete_by_filter(self, **filters) -> int:
+        """根据条件批量删除（默认软删除）"""
+        return await self.dao.delete_by_filter(**filters)
 
-    async def update_record_svc(
-        self, item_id: IdType, data: BaseModel | dict[str, Any], commit: bool = True
-    ) -> ModelT | None:
-        """
-        更新指定ID的记录。
+    async def get_paginated(
+        self, page: int = 1, page_size: int = 10, order_by: list[str] | None = None, **filters
+    ) -> tuple[list[T], int]:
+        """分页获取对象"""
+        return await self.dao.get_paginated(page, page_size, order_by, **filters)
 
-        Args:
-            item_id: 记录ID
-            data: 更新数据
-            commit: 是否自动提交事务
-        """
-        self.logger.debug(f"服务层: 正在更新 ID 为 {item_id} 的 {self.repository.model_type.__name__} 记录...")
+    async def get_or_create(self, defaults: dict[str, Any] | None = None, **kwargs) -> tuple[T, bool]:
+        """获取或创建对象"""
+        return await self.dao.get_or_create(defaults, **kwargs)
 
-        # 检查记录是否存在
-        existing_record = await self.repository.get_by_id(item_id)
-        if not existing_record:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"{self.repository.model_type.__name__} 未找到"
-            )
+    async def bulk_upsert(
+        self, objects_data: list[dict[str, Any]], conflict_fields: list[str], update_fields: list[str] | None = None
+    ) -> list[T]:
+        """批量插入或更新"""
+        return await self.dao.bulk_upsert(objects_data, conflict_fields, update_fields)
 
-        # 数据校验
-        validated_data = await self._validate_update_data(data, existing_record)
+    # 软删除方法
+    async def soft_delete(self, id: UUID) -> bool:
+        """软删除对象（标记为已删除）"""
+        return await self.dao.soft_delete_by_id(id)
 
-        # 业务逻辑验证（子类可重写）
-        await self._before_update(existing_record, validated_data)
+    async def soft_delete_by_ids(self, ids: list[UUID]) -> int:
+        """批量软删除对象"""
+        return await self.dao.soft_delete_by_ids(ids)
 
-        # 更新记录
-        updated_record = await self.repository.update_record(item_id, validated_data)
+    async def soft_delete_by_filter(self, **filters) -> int:
+        """根据条件批量软删除"""
+        return await self.dao.soft_delete_by_filter(**filters)
 
-        if commit:
-            await self.session.commit()
-            if updated_record:
-                await self.session.refresh(updated_record)
+    # 硬删除方法（物理删除）
+    async def hard_delete(self, id: UUID) -> bool:
+        """硬删除对象（物理删除）"""
+        return await self.dao.hard_delete_by_id(id)
 
-        # 更新后处理（子类可重写）
-        if updated_record:
-            await self._after_update(updated_record)
+    async def hard_delete_by_ids(self, ids: list[UUID]) -> int:
+        """批量硬删除对象"""
+        return await self.dao.hard_delete_by_ids(ids)
 
-        return updated_record
+    async def hard_delete_by_filter(self, **filters) -> int:
+        """根据条件批量硬删除"""
+        return await self.dao.hard_delete_by_filter(**filters)
 
-    async def delete_record_svc(self, item_id: IdType, hard_delete: bool = False, commit: bool = True) -> ModelT | None:
-        """
-        删除指定ID的记录。
+    # 恢复方法
+    async def restore(self, id: UUID) -> bool:
+        """恢复软删除的对象"""
+        return await self.dao.restore_by_id(id)
 
-        Args:
-            item_id: 记录ID
-            hard_delete: 是否硬删除
-            commit: 是否自动提交事务
-        """
-        self.logger.debug(
-            f"服务层: 正在删除 ID 为 {item_id} 的 {self.repository.model_type.__name__} 记录 (硬删除: {hard_delete})..."
-        )
+    async def restore_by_ids(self, ids: list[UUID]) -> int:
+        """批量恢复软删除的对象"""
+        return await self.dao.restore_by_ids(ids)
 
-        # 检查记录是否存在
-        existing_record = await self.repository.get_by_id(item_id)
-        if not existing_record:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"{self.repository.model_type.__name__} 未找到"
-            )
+    # 查询增强方法
+    async def get_active_by_id(self, id: UUID) -> T | None:
+        """根据ID获取未删除的对象"""
+        return await self.dao.get_active_by_id(id)
 
-        # 业务逻辑验证（子类可重写）
-        await self._before_delete(existing_record)
+    async def get_active_all(self, **filters) -> list[T]:
+        """获取所有未删除的对象"""
+        return await self.dao.get_active_all(**filters)
 
-        # 删除记录
-        deleted_record = await self.repository.delete_record(item_id, hard_delete=hard_delete)
+    async def get_deleted_all(self, **filters) -> list[T]:
+        """获取所有已软删除的对象"""
+        return await self.dao.get_deleted_all(**filters)
 
-        if commit:
-            await self.session.commit()
+    async def count_active(self, **filters) -> int:
+        """统计未删除对象的数量"""
+        return await self.dao.count_active(**filters)
 
-        # 删除后处理（子类可重写）
-        if deleted_record:
-            await self._after_delete(deleted_record)
+    async def count_deleted(self, **filters) -> int:
+        """统计已软删除对象的数量"""
+        return await self.dao.count_deleted(**filters)
 
-        return deleted_record
+    async def get_active_paginated(
+        self, page: int = 1, page_size: int = 10, order_by: list[str] | None = None, **filters
+    ) -> tuple[list[T], int]:
+        """分页获取未删除的对象"""
+        return await self.dao.get_active_paginated(page, page_size, order_by, **filters)
 
-    # ==================== 分页和查询 ====================
+    # ------------------- 关联查询优化方法 -------------------
+    async def get_with_related(
+        self, id: UUID, select_related: list[str] | None = None, prefetch_related: list[str] | None = None
+    ) -> T | None:
+        """根据ID获取对象（关联查询优化）"""
+        return await self.dao.get_with_related(id, select_related, prefetch_related)
 
-    async def list_records_paginated(
+    async def get_all_with_related(
+        self, select_related: list[str] | None = None, prefetch_related: list[str] | None = None, **filters
+    ) -> list[T]:
+        """获取所有对象（关联查询优化）"""
+        return await self.dao.get_all_with_related(select_related, prefetch_related, **filters)
+
+    async def get_paginated_with_related(
         self,
-        pagination: BaseQuery,
-        *filters: FilterTypes,
-        include_deleted: bool = False,
-    ) -> PagedResponse[ModelT]:
-        """
-        分页获取记录列表 - 支持Repository的FilterTypes。
+        page: int = 1,
+        page_size: int = 10,
+        order_by: list[str] | None = None,
+        select_related: list[str] | None = None,
+        prefetch_related: list[str] | None = None,
+        include_deleted: bool = True,
+        **filters,
+    ) -> tuple[list[T], int]:
+        """分页获取对象（关联查询优化）"""
+        from app.utils.logger import logger
 
-        Args:
-            pagination: 分页参数
-            *filters: Repository支持的过滤器
-            include_deleted: 是否包含已删除的记录
-        """
-        self.logger.debug(f"服务层: 正在分页查询 {self.repository.model_type.__name__} 记录...")
-
-        # 应用业务级别的过滤器（子类可重写）
-        processed_filters = await self._apply_business_filters(list(filters))
-
-        # 获取总数
-        total = await self.repository.count_records(*processed_filters, include_deleted=include_deleted)
-
-        # 获取分页数据
-        offset = (pagination.page - 1) * pagination.size
-        records = await self.repository.list(
-            *processed_filters, limit=pagination.size, offset=offset, auto_expunge=True
+        logger.info(
+            f"BaseService.get_paginated_with_related调用: page={page}, page_size={page_size}, include_deleted={include_deleted}, filters={filters}"
         )
 
-        return PagedResponse[ModelT](
-            items=records,
-            total=total,
-            page=pagination.page,
-            size=pagination.size,
-            pages=(total + pagination.size - 1) // pagination.size,
+        result = await self.dao.get_paginated_with_related(
+            page, page_size, order_by, select_related, prefetch_related, include_deleted, **filters
         )
 
-    async def list_records_paginated_dict(
-        self,
-        pagination: BaseQuery,
-        filters: dict[str, Any] | None = None,
-        include_deleted: bool = False,
-    ) -> PagedResponse[ModelT]:
-        """
-        分页获取记录列表 - 支持字典过滤器（为向后兼容保留）。
+        logger.info(f"BaseService.get_paginated_with_related返回: {len(result[0])} 条数据, total={result[1]}")
+        return result
 
-        Args:
-            pagination: 分页参数
-            filters: 字典格式过滤条件
-            include_deleted: 是否包含已删除的记录
-        """
-        self.logger.debug(f"服务层: 正在分页查询 {self.repository.model_type.__name__} 记录...")
+    # ------------------- 通用业务方法 -------------------
+    async def activate(self, id: UUID) -> bool:
+        """激活对象（设置is_active=True）"""
+        try:
+            count = await self.dao.update_by_filter({"id": id, "is_deleted": False}, is_active=True)
+            return count > 0
+        except Exception:
+            return False
 
-        # 应用业务级别的过滤器
-        final_filters = await self._apply_business_filters_dict(filters or {})
+    async def deactivate(self, id: UUID) -> bool:
+        """停用对象（设置is_active=False）"""
+        try:
+            count = await self.dao.update_by_filter({"id": id, "is_deleted": False}, is_active=False)
+            return count > 0
+        except Exception:
+            return False
 
-        # 构建查询条件
-        filter_conditions = self._build_filter_conditions(final_filters)
+    async def bulk_activate(self, ids: list[UUID]) -> int:
+        """批量激活对象"""
+        try:
+            return await self.dao.update_by_filter({"id__in": ids, "is_deleted": False}, is_active=True)
+        except Exception:
+            return 0
 
-        # 获取总数
-        total = await self.repository.count_records(*filter_conditions, include_deleted=include_deleted)
+    async def bulk_deactivate(self, ids: list[UUID]) -> int:
+        """批量停用对象"""
+        try:
+            return await self.dao.update_by_filter({"id__in": ids, "is_deleted": False}, is_active=False)
+        except Exception:
+            return 0
 
-        # 获取分页数据
-        offset = (pagination.page - 1) * pagination.size
-        records = await self.repository.list(
-            *filter_conditions, limit=pagination.size, offset=offset, auto_expunge=True
-        )
+    async def bulk_create_optimized(self, objects_data: list[dict[str, Any]], batch_size: int = 1000) -> list[T]:
+        """批量创建对象（支持大数据量）"""
+        processed_data = await self.before_bulk_create(objects_data)
+        objects = await self.dao.bulk_create_in_batches(processed_data, batch_size)
+        if objects:
+            await self.after_bulk_create(objects)
+        return objects
 
-        return PagedResponse[ModelT](
-            items=records,
-            total=total,
-            page=pagination.page,
-            size=pagination.size,
-            pages=(total + pagination.size - 1) // pagination.size,
-        )
+    async def bulk_create_ignore_conflicts(
+        self, objects_data: list[dict[str, Any]], conflict_fields: list[str] | None = None
+    ) -> list[T]:
+        """批量创建对象，忽略冲突"""
+        processed_data = await self.before_bulk_create(objects_data)
+        objects = await self.dao.bulk_create_ignore_conflicts(processed_data, conflict_fields)
+        if objects:
+            await self.after_bulk_create(objects)
+        return objects
 
-    async def list_all_records_svc(
-        self, *filters: FilterTypes, include_deleted: bool = False, auto_expunge: bool = True
-    ) -> Sequence[ModelT]:
-        """
-        获取所有符合条件的记录。
-        """
-        self.logger.debug(f"服务层: 正在列出所有 {self.repository.model_type.__name__} 记录...")
+    async def bulk_update_optimized(
+        self, updates: list[dict[str, Any]], id_field: str = "id", batch_size: int = 1000
+    ) -> int:
+        """批量更新对象"""
+        processed_updates = await self.before_bulk_update(updates)
+        return await self.dao.bulk_update_optimized(processed_updates, id_field, batch_size)
 
-        # 应用业务级别的过滤器
-        processed_filters = await self._apply_business_filters(list(filters))
+    async def bulk_soft_delete_optimized(self, ids: list[UUID], batch_size: int = 1000) -> int:
+        """批量软删除"""
+        return await self.dao.bulk_soft_delete_optimized(ids, batch_size)
 
-        return await self.repository.get_all_records(
-            *processed_filters, include_deleted=include_deleted, auto_expunge=auto_expunge
-        )
-
-    async def count_all_records_svc(self, *filters: FilterTypes, include_deleted: bool = False) -> int:
-        """
-        计算符合条件的记录数量。
-        """
-        self.logger.debug(f"服务层: 正在计算 {self.repository.model_type.__name__} 记录数量...")
-
-        # 应用业务级别的过滤器
-        processed_filters = await self._apply_business_filters(list(filters))
-
-        return await self.repository.count_records(*processed_filters, include_deleted=include_deleted)
-
-    # ==================== 响应数据转换 ====================
-
-    def _transform_response(self, record: ModelT) -> dict[str, Any] | ModelT:
-        """
-        转换响应数据（子类可重写）。
-
-        Args:
-            record: ORM模型实例
-
-        Returns:
-            转换后的响应数据
-        """
-        if self.response_schema:
-            # 使用指定的响应模式转换
-            return self.response_schema.model_validate(record).model_dump()
-        return record
-
-    def _transform_response_list(self, records: Sequence[ModelT]) -> list[dict[str, Any] | ModelT]:
-        """
-        批量转换响应数据。
-        """
-        return [self._transform_response(record) for record in records]
-
-    # ==================== 事务管理 ====================
-
-    @asynccontextmanager
-    async def transaction(self):
-        if self.session.in_transaction():  # 检查是否已在事务中
-            self.logger.debug("加入现有事务...")
-            try:
-                yield self.session
-            except Exception as e:
-                self.logger.error(f"嵌套事务块中发生错误: {e}", exc_info=True)
-                raise  # 错误冒泡到外层事务处理
-        else:
-            self.logger.debug("开始新事务...")
-            async with self.session.begin():  # begin() 会自动处理提交和回滚
-                try:
-                    yield self.session
-                    self.logger.debug("事务块成功完成（等待外部begin()提交）。")
-                # SQLAlchemyError 和其他 Exception 会导致 begin() 自动回滚
-                except Exception as e:  # 重新抛出，让调用者知道
-                    self.logger.error(f"事务中发生错误: {e}", exc_info=True)
-                    raise
-            self.logger.debug("事务已结束（已提交或回滚）。")
-
-    # ==================== 异常处理 ====================
-
-    def _handle_database_error(self, e: Exception, operation: str) -> None:
-        """
-        处理数据库异常（子类可重写）。
-
-        Args:
-            e: 异常实例
-            operation: 操作类型（create/update/delete）
-        """
-        self.logger.error(f"数据库操作失败 [{operation}]: {e}")
-
-        # 使用统一的异常转换器
-        business_exception = database_exception_handler(e, operation)
-        raise business_exception
-
-    # ==================== 数据校验钩子（子类可重写） ====================
-
-    async def _validate_create_data(self, data: BaseModel | dict[str, Any]) -> dict[str, Any]:
-        """验证创建数据"""
-        if self.create_schema and isinstance(data, dict):
-            validated = self.create_schema(**data)
-            return validated.model_dump(exclude_unset=True)
-        elif isinstance(data, BaseModel):
-            return data.model_dump(exclude_unset=True)
-        return data if isinstance(data, dict) else {}
-
-    async def _validate_update_data(self, data: BaseModel | dict[str, Any], existing_record: ModelT) -> dict[str, Any]:
-        """验证更新数据"""
-        if self.update_schema and isinstance(data, dict):
-            validated = self.update_schema(**data)
-            return validated.model_dump(exclude_unset=True)
-        elif isinstance(data, BaseModel):
-            return data.model_dump(exclude_unset=True)
-        return data if isinstance(data, dict) else {}
-
-    # ==================== 业务逻辑钩子（子类可重写） ====================
-
-    async def _before_create(self, data: dict[str, Any]) -> None:
-        """创建前的业务逻辑"""
-        pass
-
-    async def _after_create(self, record: ModelT) -> None:
-        """创建后的业务逻辑"""
-        pass
-
-    async def _before_update(self, existing_record: ModelT, data: dict[str, Any]) -> None:
-        """更新前的业务逻辑"""
-        pass
-
-    async def _after_update(self, record: ModelT) -> None:
-        """更新后的业务逻辑"""
-        pass
-
-    async def _before_delete(self, record: ModelT) -> None:
-        """删除前的业务逻辑"""
-        pass
-
-    async def _after_delete(self, record: ModelT) -> None:
-        """删除后的业务逻辑"""
-        pass
-
-    # ==================== 过滤器相关 ====================
-
-    async def _apply_business_filters(self, filters: list[FilterTypes]) -> list[FilterTypes]:
-        """应用业务级别的过滤器（如数据权限）"""
-        # 子类可以重写这个方法来实现业务逻辑过滤
-        return filters
-
-    async def _apply_business_filters_dict(self, filters: dict[str, Any]) -> dict[str, Any]:
-        """应用业务级别的字典过滤器"""
-        # 子类可以重写这个方法来实现业务逻辑过滤
-        return filters
-
-    def _build_filter_conditions(self, filters: dict[str, Any]) -> list[FilterTypes]:
-        """构建SQLAlchemy的过滤条件。"""
-        conditions = []
-        for key, value in filters.items():
-            if hasattr(self.repository.model_type, key):
-                column = getattr(self.repository.model_type, key)
-                if isinstance(value, list):
-                    conditions.append(column.in_(value))
-                else:
-                    conditions.append(column == value)
-        return conditions
+    async def bulk_restore_optimized(self, ids: list[UUID], batch_size: int = 1000) -> int:
+        """批量恢复"""
+        return await self.dao.bulk_restore_optimized(ids, batch_size)

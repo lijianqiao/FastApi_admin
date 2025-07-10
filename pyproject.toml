@@ -3,26 +3,26 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "fastapi-admin"
+name = "Network_devices_management_system"
 version = "0.1.0"
-description = "基于 Fastapi 的 Admin 后台管理系统"
+description = "基于 Fastapi 构建的网络设备管理系统"
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
 authors = [{ name = "lijianqiao", email = "lijianqiao2906@live.com" }]
 dependencies = [
-    "advanced-alchemy>=1.4.4",
-    "aioredis>=2.0.1",
-    "alembic>=1.16.1",
+    "aerich>=0.9.1",
     "asyncpg>=0.30.0",
-    "bcrypt==4.0.1",
     "fastapi[standard]>=0.115.12",
+    "itsdangerous>=2.2.0",
+    "loguru>=0.7.3",
     "passlib[bcrypt]>=1.7.4",
-    "psycopg2>=2.9.10",
+    "psutil>=7.0.0",
     "pydantic-settings>=2.9.1",
-    "python-jose[cryptography]>=3.5.0",
-    "redis>=6.2.0",
-    "starlette-exporter>=0.23.0",
+    "pyjwt>=2.10.1",
+    "redis[hiredis]>=6.2.0",
+    "tortoise-orm>=0.25.1",
+    "uvicorn[standard]>=0.34.3",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -31,23 +31,11 @@ packages = ["app"]
 [tool.ruff]
 line-length = 120
 target-version = "py313"
-exclude = [".git", "__pycache__", ".venv", "alembic/versions"]
+exclude = [".git", "__pycache__", ".venv", ".vscode"]
 
 [tool.ruff.lint]
-select = [
-    "E",  # pycodestyle 错误
-    "W",  # PycodeStyle 警告
-    "F",  # Pyflakes
-    "I",  # isort
-    "B",  # flake8-bugbear
-    "C4", # flake8 推导式
-    "UP", # pyupgrade
-]
-ignore = [
-    "E501", # 行太长，由 black 处理
-    "B008", # 不在参数默认值中执行函数调用
-    "W191", # 缩进包含制表符
-]
+select = ["E", "W", "F", "I", "B", "C4", "UP"]
+ignore = ["E501", "B008", "W191"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -60,14 +48,13 @@ known-first-party = ["app"]
 
 [dependency-groups]
 dev = [
-    "aiosqlite>=0.21.0",
     "httpx>=0.28.1",
     "pytest>=8.4.0",
     "pytest-asyncio>=1.0.0",
-    "ruff>=0.11.11",
+    "ruff>=0.12.2",
 ]
 
-# 项目级将 uv 下载源换成国内源 - 清华大学
-[[tool.uv.index]]
-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
-default = true
+[tool.aerich]
+tortoise_orm = "app.db.connection.TORTOISE_ORM"
+location = "./migrations"
+src_folder = "." 

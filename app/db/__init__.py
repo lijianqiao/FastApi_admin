@@ -1,30 +1,24 @@
 """
+-*- coding: utf-8 -*-
 @Author: li
 @Email: lijianqiao2906@live.com
 @FileName: __init__.py
-@DateTime: 2025/05/29 19:39:42
-@Docs: 数据库模块初始化 - 简化设计
+@DateTime: 2025/06/16
+@Docs: 数据库模块
 """
 
-from advanced_alchemy.base import BigIntAuditBase, UUIDAuditBase
-
-from app.db.session import (
-    DatabaseManager,
-    database_manager,
-    get_async_session,
-    get_sqlalchemy_config,
-    sqlalchemy_config,
+from .connection import (
+    TORTOISE_ORM,
+    check_database_connection,
+    close_database,
+    generate_schemas,
+    init_database,
 )
 
 __all__ = [
-    # 基础模型
-    "UUIDAuditBase",
-    "BigIntAuditBase",
-    # 会话管理
-    "get_async_session",
-    "get_sqlalchemy_config",
-    "sqlalchemy_config",
-    # 数据库管理
-    "DatabaseManager",
-    "database_manager",
+    "TORTOISE_ORM",
+    "init_database",
+    "close_database",
+    "generate_schemas",
+    "check_database_connection",
 ]

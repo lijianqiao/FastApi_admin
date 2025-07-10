@@ -1,23 +1,24 @@
 """
-@Author: li
-@Email: lijianqiao2906@live.com
-@FileName: __init__.py
-@DateTime: 2025/06/03 02:32:03
-@Docs: 服务层模块导出
+-*- coding: utf-8 -*-
+ @Author: li
+ @Email: lijianqiao2906@live.com
+ @FileName: __init__.py
+ @DateTime: 2025/3/11 上午9:53
+ @Docs: 服务层模块导出
 """
 
-from app.services.audit_service import AuditLogService
-from app.services.auth_service import AuthService
-from app.services.base import AppBaseService
-from app.services.permission_service import PermissionService
-from app.services.role_service import RoleService
-from app.services.user_service import UserService
+from app.services.auth import AuthService
+from app.services.base import BaseService
+from app.services.operation_log import OperationLogService
+from app.services.permission import PermissionService
+from app.services.role import RoleService
+from app.services.user import UserService
 
 __all__ = [
-    "AuditLogService",
-    "AuthService",
+    "BaseService",
     "UserService",
-    "PermissionService",
+    "AuthService",
     "RoleService",
-    "AppBaseService",
+    "PermissionService",
+    "OperationLogService",
 ]

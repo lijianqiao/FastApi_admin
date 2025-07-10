@@ -1,68 +1,92 @@
 """
+-*- coding: utf-8 -*-
 @Author: li
+@ProjectName: netmon
 @Email: lijianqiao2906@live.com
-@FileName: app.py
-@DateTime: 2025/05/29 19:41:07
-@Docs: FastAPI 应用程序入口点
+@FileName: main.py
+@DateTime: 2025/03/08 04:50:00
+@Docs: 应用程序入口
 """
 
-from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
+from tortoise.contrib.fastapi import register_tortoise
 
-from app.api import api_router
-from app.config import settings
-from app.db.session import database_manager
-from app.metrics import setup_metrics
-from app.middleware import setup_middlewares
-from app.services.cache_service import cache_service
+from app.core.config import settings
+from app.core.events import lifespan
+from app.core.exceptions import setup_exception_handlers
+from app.core.middleware import setup_middlewares
 
 
 def create_app() -> FastAPI:
-    """创建 FastAPI 应用实例"""
+    """创建FastAPI应用实例
 
-    @asynccontextmanager
-    async def lifespan(app: FastAPI):
-        # 应用启动时检查数据库连接
-        connected = await database_manager.check_connection()
-        if not connected:
-            raise RuntimeError("数据库连接失败，应用无法启动")
-
-        # 初始化缓存服务
-        await cache_service.init_redis()
-
-        yield
-
-        # 应用关闭时关闭连接
-        await database_manager.close()
-        await cache_service.close()
-
+    Returns:
+        FastAPI: FastAPI应用实例
+    """
+    # 创建FastAPI应用
     app = FastAPI(
-        title=settings.app_name,
-        openapi_url=f"{settings.api_v1_prefix}/openapi.json",
-        docs_url=f"{settings.api_v1_prefix}/docs",
-        redoc_url=f"{settings.api_v1_prefix}/redoc",
-        version=settings.app_version,
-        description=settings.app_description,
-        debug=settings.debug,
-        contact={
-            "name": "li",
-            "email": "lijianqiao2906@live.com",
-            "url": "https://gitee.com/lijianqiao",
-        },
+        title=settings.APP_NAME,
+        description=settings.APP_DESCRIPTION,
+        version=settings.APP_VERSION,
+        debug=settings.DEBUG,
         lifespan=lifespan,
+        docs_url=f"{settings.API_PREFIX}/docs" if settings.ENABLE_DOCS else None,
+        redoc_url=f"{settings.API_PREFIX}/redoc" if settings.ENABLE_DOCS else None,
+        openapi_url=f"{settings.API_PREFIX}/openapi.json" if settings.ENABLE_DOCS else None,
+        # 配置 Swagger UI 的 OAuth2 认证
+        swagger_ui_oauth2_redirect_url=f"{settings.API_PREFIX}/docs/oauth2-redirect",
+        swagger_ui_init_oauth={
+            "usePkceWithAuthorizationCodeGrant": True,
+        },
     )
 
-    # 设置所有中间件（包括CORS、限流、审计、错误处理等）
+    # 设置中间件
     setup_middlewares(app)
 
-    # 设置 Prometheus 指标
-    setup_metrics(app)
+    # 设置异常处理器
+    setup_exception_handlers(app)
 
-    # 包含 API 路由
-    app.include_router(api_router)
+    # 注册路由
+    register_routes(app)
+
+    # 注册Tortoise ORM
+    register_tortoise_orm(app)
 
     return app
 
 
-app = create_app()  # 如果您全局实例化应用程序，请确保设置指标和错误处理程序。
+def register_routes(app: FastAPI) -> None:
+    """注册API路由
+
+    Args:
+        app (FastAPI): FastAPI应用实例
+    """
+    # 导入路由模块
+    from app.api import api_router
+
+    # 注册主路由
+    app.include_router(api_router, prefix=settings.API_PREFIX)
+
+
+def register_tortoise_orm(app: FastAPI) -> None:
+    """注册Tortoise ORM
+
+    Args:
+        app (FastAPI): FastAPI应用实例
+    """
+    register_tortoise(
+        app,
+        config=settings.TORTOISE_ORM_CONFIG,
+        generate_schemas=False,  # 不自动生成数据库结构，使用Aerich进行迁移
+    )
+
+
+# 创建FastAPI应用实例
+app = create_app()
+
+
+# 根路由
+@app.get("/", tags=["系统"])
+async def root():
+    """根路由"""
+    return {"message": "Welcome to the Fastapi Admin Template API!"}

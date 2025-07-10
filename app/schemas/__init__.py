@@ -1,104 +1,28 @@
 """
-Pydantic 模式模块 - 现代后台管理系统最优设计
-Schemas模块导出，提供完整的现代后台功能模型
+-*- coding: utf-8 -*-
+ @Author: li
+ @Email: lijianqiao2906@live.com
+ @FileName: __init__.py
+ @DateTime: 2025/3/11 上午9:53
+ @Docs: Schemas包导出
 """
 
-from .schemas import (
-    APIResponse,
-    AuditLogBase,
-    AuditLogCreate,
-    AuditLogQuery,
-    AuditLogResponse,
-    BaseQuery,
-    BaseSchema,
-    BatchDeleteRequest,
-    BatchOperationResponse,
-    BatchUpdateRequest,
-    ErrorDetail,
-    LoginRequest,
-    LoginResponse,
-    LogoutRequest,
-    LogoutResponse,
-    PagedResponse,
-    PermissionBase,
-    PermissionCreate,
-    PermissionResponse,
-    PermissionUpdate,
-    PermissionWithRoles,
-    RefreshTokenRequest,
-    RefreshTokenResponse,
-    RoleBase,
-    RoleCreate,
-    RolePermissionAssignRequest,
-    RoleQuery,
-    RoleResponse,
-    RoleUpdate,
-    RoleWithPermission,
-    RoleWithPermissions,
-    RoleWithUsers,
-    SearchQuery,
-    SystemStats,
-    TimestampMixin,
-    TokenResponse,
-    UserActivityStats,
-    UserBase,
-    UserCreate,
-    UserInfo,
-    UserPasswordChange,
-    UserQuery,
-    UserResponse,
-    UserRoleAssignRequest,
-    UserUpdate,
-    UserWithRoles,
-    ValidationErrorResponse,
-)
+# 基础schemas
+# 认证schemas
+from app.schemas.auth import *  # noqa: F403
+from app.schemas.base import *  # noqa: F403
 
-__all__ = [
-    "APIResponse",
-    "BaseSchema",
-    "PagedResponse",
-    "TimestampMixin",
-    "BaseQuery",
-    "SearchQuery",
-    "UserQuery",
-    "RoleQuery",
-    "AuditLogQuery",
-    "UserBase",
-    "UserCreate",
-    "UserUpdate",
-    "UserPasswordChange",
-    "UserResponse",
-    "UserWithRoles",
-    "UserInfo",
-    "RoleBase",
-    "RoleCreate",
-    "RoleUpdate",
-    "RoleResponse",
-    "RoleWithPermissions",
-    "RoleWithUsers",
-    "RoleWithPermission",
-    "PermissionBase",
-    "PermissionCreate",
-    "PermissionUpdate",
-    "PermissionResponse",
-    "PermissionWithRoles",
-    "AuditLogBase",
-    "AuditLogCreate",
-    "AuditLogResponse",
-    "LoginRequest",
-    "LoginResponse",
-    "LogoutRequest",
-    "LogoutResponse",
-    "TokenResponse",
-    "RefreshTokenRequest",
-    "RefreshTokenResponse",
-    "BatchDeleteRequest",
-    "BatchUpdateRequest",
-    "BatchOperationResponse",
-    "UserRoleAssignRequest",
-    "RolePermissionAssignRequest",
-    "SystemStats",
-    "UserActivityStats",
-    "ErrorDetail",
-    "ValidationErrorResponse",
-]
+# 操作日志schemas
+from app.schemas.operation_log import *  # noqa: F403
+
+# 权限管理schemas
+from app.schemas.permission import *  # noqa: F403
+
+# 角色管理schemas
+from app.schemas.role import *  # noqa: F403
+
+# 类型schemas
+from app.schemas.types import *  # noqa: F403
+
+# 用户管理schemas
+from app.schemas.user import *  # noqa: F403

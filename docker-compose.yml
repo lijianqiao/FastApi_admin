@@ -1,0 +1,44 @@
+services:
+  # Web应用
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=true
+      - DB_HOST=db
+      - REDIS_HOST=redis
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  # PostgreSQL数据库
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=fastapi_base
+      - POSTGRES_USER=lijianqiao
+      - POSTGRES_PASSWORD=123456
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+volumes:
+  postgres_data:
+  redis_data:
