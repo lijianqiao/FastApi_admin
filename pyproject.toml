@@ -13,6 +13,7 @@ authors = [{ name = "lijianqiao", email = "lijianqiao2906@live.com" }]
 dependencies = [
     "aerich>=0.9.1",
     "asyncpg>=0.30.0",
+    "fastapi-throttle>=0.1.6",
     "fastapi[standard]>=0.115.12",
     "itsdangerous>=2.2.0",
     "loguru>=0.7.3",
@@ -21,7 +22,6 @@ dependencies = [
     "pydantic-settings>=2.9.1",
     "pyjwt>=2.10.1",
     "redis[hiredis]>=6.2.0",
-    "slowapi>=0.1.9",
     "tortoise-orm>=0.25.1",
     "uvicorn[standard]>=0.34.3",
 ]

@@ -8,8 +8,7 @@
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.security import OAuth2PasswordRequestForm
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+from fastapi_throttle import RateLimiter
 
 from app.models.user import User
 from app.schemas.auth import (
@@ -25,11 +24,10 @@ from app.services.auth import AuthService
 from app.utils.deps import get_auth_service, get_current_active_user
 
 router = APIRouter(prefix="/auth", tags=["认证管理"])
-limiter = Limiter(key_func=get_remote_address)
+login_limiter = RateLimiter(times=3, seconds=10)  # 限制登录请求频率为每10秒3次
 
 
-@router.post("/login", response_model=TokenResponse, summary="用户登录")
-@limiter.limit("10/minute")  # 限制登录请求频率
+@router.post("/login", response_model=TokenResponse, summary="用户登录", dependencies=[Depends(login_limiter)])
 async def login(
     login_data: LoginRequest,
     request: Request,
@@ -41,8 +39,7 @@ async def login(
     return await auth_service.login(login_data, client_ip, user_agent)
 
 
-@router.post("/login/form", response_model=TokenResponse, summary="表单登录")
-@limiter.limit("10/minute")  # 限制登录请求频率
+@router.post("/login/form", response_model=TokenResponse, summary="表单登录", dependencies=[Depends(login_limiter)])
 async def login_form(
     request: Request,
     auth_service: AuthService = Depends(get_auth_service),
