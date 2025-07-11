@@ -35,6 +35,7 @@ from app.utils.operation_logger import (
     log_query_with_context,
     log_update_with_context,
 )
+from app.utils.permission_cache_utils import invalidate_user_permission_cache
 
 
 class UserService(BaseService[User]):
@@ -192,6 +193,7 @@ class UserService(BaseService[User]):
             is_active=is_active,
         )
 
+    @invalidate_user_permission_cache("user_id")
     async def assign_roles(
         self, user_id: UUID, role_ids: list[UUID], operation_context: OperationContext
     ) -> UserDetailResponse:
@@ -204,6 +206,7 @@ class UserService(BaseService[User]):
         await self.dao.set_user_roles(user_id, role_ids)
         return await self.get_user_detail(user_id, operation_context)
 
+    @invalidate_user_permission_cache("user_id")
     async def add_user_roles(
         self, user_id: UUID, role_ids: list[UUID], operation_context: OperationContext
     ) -> UserDetailResponse:
@@ -215,6 +218,7 @@ class UserService(BaseService[User]):
         await self.dao.add_user_roles(user_id, role_ids)
         return await self.get_user_detail(user_id, operation_context)
 
+    @invalidate_user_permission_cache("user_id")
     async def remove_user_roles(
         self, user_id: UUID, role_ids: list[UUID], operation_context: OperationContext
     ) -> UserDetailResponse:
@@ -235,6 +239,7 @@ class UserService(BaseService[User]):
         roles = await self.dao.get_user_roles(user_id)
         return [{"id": role.id, "role_name": role.role_name, "role_code": role.role_code} for role in roles]
 
+    @invalidate_user_permission_cache("user_id")
     async def assign_permissions_to_user(
         self, user_id: UUID, request: UserAssignPermissionsRequest, operation_context: OperationContext
     ) -> UserDetailResponse:

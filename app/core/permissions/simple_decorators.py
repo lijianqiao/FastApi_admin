@@ -13,6 +13,7 @@ from uuid import UUID
 
 from fastapi import Depends
 
+from app.core.config import settings
 from app.core.exceptions import ForbiddenException, UnauthorizedException
 from app.dao.user import UserDAO
 from app.models.user import User
@@ -21,20 +22,69 @@ from app.utils.logger import logger
 
 
 class PermissionCache:
-    """权限缓存管理器"""
+    """权限缓存管理器 - 使用Redis缓存"""
 
     def __init__(self):
-        self._cache = {}
-        self.cache_ttl = 3600
+        self.cache_ttl = settings.PERMISSION_CACHE_TTL
+        self.enable_redis = settings.ENABLE_REDIS_CACHE
+        logger.info(f"权限缓存配置: Redis启用={self.enable_redis}, TTL={self.cache_ttl}秒")
+
+    async def _get_cache_backend(self):
+        """获取缓存后端"""
+        if not self.enable_redis:
+            logger.info("权限缓存: 配置禁用Redis，使用内存缓存")
+            from app.utils.redis_cache import _memory_fallback
+
+            return _memory_fallback
+
+        # 配置启用Redis时尝试连接
+        try:
+            from app.utils.redis_cache import get_redis_cache
+
+            redis_cache = await get_redis_cache()
+
+            # 测试Redis连接
+            test_result = await redis_cache.set("test:connection", "ok", 10)
+            if test_result:
+                await redis_cache.delete("test:connection")
+                logger.debug("权限缓存: Redis连接测试成功，使用Redis缓存")
+                return redis_cache
+            else:
+                raise Exception("Redis连接测试失败")
+
+        except Exception as e:
+            logger.warning(f"权限缓存: Redis不可用，降级到内存缓存: {e}")
+            from app.utils.redis_cache import _memory_fallback
+
+            return _memory_fallback
 
     async def get_user_permissions(self, user_id: UUID) -> set[str]:
         """获取用户权限（含缓存）"""
         cache_key = f"user:permissions:{user_id}"
-        if cache_key in self._cache:
-            return self._cache[cache_key]
+        cache_backend = await self._get_cache_backend()
+        backend_type = cache_backend.__class__.__name__
 
+        # 尝试从缓存获取
+        cached_permissions = await cache_backend.get(cache_key)
+        if cached_permissions is not None:
+            logger.info(f"权限缓存命中: 用户={user_id}, 后端={backend_type}, 权限数量={len(cached_permissions)}")
+            logger.debug(f"缓存权限详情: {cached_permissions}")
+            return cached_permissions
+
+        # 缓存未命中，从数据库获取
+        logger.info(f"权限缓存未命中: 用户={user_id}, 后端={backend_type}, 从数据库加载")
         permissions = await self._fetch_user_permissions(user_id)
-        self._cache[cache_key] = permissions
+
+        # 存入缓存
+        success = await cache_backend.set(cache_key, permissions, self.cache_ttl)
+        if success:
+            logger.info(
+                f"权限缓存设置成功: 用户={user_id}, 后端={backend_type}, 权限数量={len(permissions)}, TTL={self.cache_ttl}秒"
+            )
+            logger.debug(f"新缓存权限详情: {permissions}")
+        else:
+            logger.warning(f"权限缓存设置失败: 用户={user_id}, 后端={backend_type}")
+
         return permissions
 
     async def _fetch_user_permissions(self, user_id: UUID) -> set[str]:
@@ -71,11 +121,76 @@ class PermissionCache:
     async def invalidate_user_cache(self, user_id: UUID):
         """清除用户权限缓存"""
         cache_key = f"user:permissions:{user_id}"
-        self._cache.pop(cache_key, None)
+        cache_backend = await self._get_cache_backend()
+        backend_type = cache_backend.__class__.__name__
 
-    def clear_all_cache(self):
-        """清除所有缓存"""
-        self._cache.clear()
+        success = await cache_backend.delete(cache_key)
+        if success:
+            logger.info(f"用户权限缓存清除成功: 用户={user_id}, 后端={backend_type}")
+        else:
+            logger.warning(f"用户权限缓存清除失败: 用户={user_id}, 后端={backend_type}")
+
+    async def invalidate_role_cache(self, role_id: UUID):
+        """清除角色相关的所有用户权限缓存"""
+        cache_backend = await self._get_cache_backend()
+
+        # 由于无法直接知道哪些用户拥有这个角色，使用模式匹配删除
+        try:
+            # 检查是否为Redis缓存后端（通过类名判断）
+            if cache_backend.__class__.__name__ == "RedisCache":
+                deleted_count = await cache_backend.delete_pattern("user:permissions:*")  # type: ignore
+                logger.info(f"角色权限变更，清除所有用户权限缓存，删除数量: {deleted_count}")
+            else:
+                # 内存缓存的情况
+                await cache_backend.clear_all()
+                logger.info("角色权限变更，清除所有内存权限缓存")
+        except Exception as e:
+            logger.error(f"清除角色相关权限缓存失败: {e}")
+
+    async def clear_all_cache(self):
+        """清除所有权限缓存"""
+        cache_backend = await self._get_cache_backend()
+        await cache_backend.clear_all()
+        logger.info("所有权限缓存已清除")
+
+    async def get_cache_stats(self) -> dict:
+        """获取缓存统计信息"""
+        cache_backend = await self._get_cache_backend()
+        backend_type = cache_backend.__class__.__name__
+
+        logger.debug(f"获取缓存统计: 后端类型={backend_type}, 配置启用Redis={self.enable_redis}")
+
+        # 检查是否为Redis缓存后端（通过类名判断）
+        if backend_type == "RedisCache":
+            try:
+                # Redis缓存统计
+                client = await cache_backend._get_client()  # type: ignore
+                if client:
+                    info = await client.info("memory")
+                    keys_count = len(await client.keys("user:permissions:*"))
+                    stats = {
+                        "backend": "redis",
+                        "backend_class": backend_type,
+                        "permission_keys": keys_count,
+                        "memory_usage": info.get("used_memory_human", "N/A"),
+                        "ttl": self.cache_ttl,
+                        "enable_redis_config": self.enable_redis,
+                    }
+                    logger.debug(f"Redis缓存统计详情: {stats}")
+                    return stats
+            except Exception as e:
+                logger.error(f"获取Redis缓存统计失败: {e}")
+
+        # 内存缓存统计
+        stats = {
+            "backend": "memory",
+            "backend_class": backend_type,
+            "permission_keys": len(getattr(cache_backend, "_cache", {})),
+            "ttl": self.cache_ttl,
+            "enable_redis_config": self.enable_redis,
+        }
+        logger.debug(f"内存缓存统计详情: {stats}")
+        return stats
 
 
 _permission_cache = PermissionCache()
@@ -137,6 +252,18 @@ class PermissionManager:
     async def clear_user_cache(self, user_id: UUID):
         """清除指定用户的权限缓存"""
         await _permission_cache.invalidate_user_cache(user_id)
+
+    async def clear_role_cache(self, role_id: UUID):
+        """清除角色相关的权限缓存"""
+        await _permission_cache.invalidate_role_cache(role_id)
+
+    async def clear_all_cache(self):
+        """清除所有权限缓存"""
+        await _permission_cache.clear_all_cache()
+
+    async def get_cache_stats(self):
+        """获取缓存统计信息"""
+        return await _permission_cache.get_cache_stats()
 
 
 permission_manager = PermissionManager()

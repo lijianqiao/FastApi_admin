@@ -15,6 +15,7 @@ from tortoise import Tortoise
 
 from app.core.config import settings
 from app.utils.logger import logger
+from app.utils.permission_cache_utils import clear_all_permission_cache
 
 
 @asynccontextmanager
@@ -48,6 +49,9 @@ async def startup(app: FastAPI) -> None:
     # 初始化Redis连接
     await init_redis(app)
 
+    # 初始化权限缓存
+    await init_permission_cache()
+
     logger.info(f"应用程序 {settings.APP_NAME} 启动完成")
 
 
@@ -63,6 +67,7 @@ async def shutdown(app: FastAPI) -> None:
     await close_db()
 
     # 关闭Redis连接
+    await clear_all_permission_cache()  # 清除权限缓存
     await close_redis(app)
 
     logger.info(f"应用程序 {settings.APP_NAME} 已关闭")
@@ -102,7 +107,7 @@ async def init_redis(app: FastAPI) -> None:
             encoding="utf-8",
             decode_responses=True,  # 通常希望自动解码响应
         )
-        # 测试连接 (可选, 但推荐)
+        # 测试连接
         await app.state.redis.ping()
         logger.info("Redis连接初始化完成并通过ping测试")
     except Exception as e:
@@ -116,11 +121,41 @@ async def close_redis(app: FastAPI) -> None:
     if hasattr(app.state, "redis") and app.state.redis:
         try:
             await app.state.redis.close()  # 关闭连接
-            # 对于由 from_url 创建的实例，其内部可能会管理一个连接池，
-            # close() 方法通常会释放相关资源。
-            # 如果直接使用 ConnectionPool，则调用 pool.disconnect()
             logger.info("Redis连接已关闭")
         except Exception as e:
             logger.error(f"关闭Redis连接时出错: {e}")
     else:
         logger.info("没有活动的Redis连接需要关闭")
+
+
+async def init_permission_cache() -> None:
+    """初始化权限缓存系统"""
+    try:
+        logger.info("正在初始化权限缓存系统...")
+        from app.utils.redis_cache import get_redis_cache
+
+        # 测试Redis缓存是否可用
+        cache = await get_redis_cache()
+        test_key = "permission:cache:test"
+        test_value = {"test": "permissions"}
+
+        # 测试缓存操作
+        await cache.set(test_key, test_value, 60)  # 设置60秒TTL
+        cached_value = await cache.get(test_key)
+
+        if cached_value and cached_value.get("test") == "permissions":
+            logger.info("权限缓存系统初始化成功，Redis缓存工作正常")
+            # 清除测试数据
+            await cache.delete(test_key)
+        else:
+            logger.warning("权限缓存系统测试失败，将使用内存缓存作为备用方案")
+
+        # 获取缓存统计
+        from app.utils.permission_cache_utils import get_permission_cache_stats
+
+        stats = await get_permission_cache_stats()
+        logger.info(f"权限缓存统计: {stats}")
+
+    except Exception as e:
+        logger.error(f"权限缓存系统初始化失败: {e}")
+        logger.info("将使用内存缓存作为备用方案")

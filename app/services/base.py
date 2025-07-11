@@ -289,17 +289,11 @@ class BaseService[T: BaseModel]:
         **filters,
     ) -> tuple[list[T], int]:
         """分页获取对象（关联查询优化）"""
-        from app.utils.logger import logger
-
-        logger.info(
-            f"BaseService.get_paginated_with_related调用: page={page}, page_size={page_size}, include_deleted={include_deleted}, filters={filters}"
-        )
 
         result = await self.dao.get_paginated_with_related(
             page, page_size, order_by, select_related, prefetch_related, include_deleted, **filters
         )
 
-        logger.info(f"BaseService.get_paginated_with_related返回: {len(result[0])} 条数据, total={result[1]}")
         return result
 
     # ------------------- 通用业务方法 -------------------

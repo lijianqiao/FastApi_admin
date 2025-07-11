@@ -13,6 +13,7 @@ from app.api.v1 import (
     admin_routes,
     auth,
     operation_logs,
+    permission_cache,
     permissions,
     roles,
     user_relations,
@@ -31,6 +32,7 @@ api_router.include_router(operation_logs.router, tags=["操作日志管理"])
 api_router.include_router(user_relations.router, tags=["用户关系管理"])
 api_router.include_router(admin_dashboard.router, tags=["后台管理仪表板"])
 api_router.include_router(admin_routes.admin_router, tags=["管理员专用"])
+api_router.include_router(permission_cache.router, tags=["权限缓存管理"])
 
 # 保持向后兼容
 v1_router = api_router

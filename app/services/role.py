@@ -30,6 +30,7 @@ from app.utils.operation_logger import (
     log_query_with_context,
     log_update_with_context,
 )
+from app.utils.permission_cache_utils import invalidate_role_permission_cache
 
 
 class RoleService(BaseService[Role]):
@@ -137,6 +138,7 @@ class RoleService(BaseService[Role]):
         return RoleDetailResponse.model_validate(role)
 
     @log_update_with_context("role")
+    @invalidate_role_permission_cache("role_id")
     async def assign_permissions_to_role(
         self, role_id: UUID, request: RolePermissionAssignRequest, operation_context: OperationContext
     ) -> RoleDetailResponse:
@@ -150,6 +152,7 @@ class RoleService(BaseService[Role]):
         return await self.get_role_detail(role_id, operation_context)
 
     @log_update_with_context("role")
+    @invalidate_role_permission_cache("role_id")
     async def add_role_permissions(
         self, role_id: UUID, permission_ids: list[UUID], operation_context: OperationContext
     ) -> RoleDetailResponse:
@@ -162,6 +165,7 @@ class RoleService(BaseService[Role]):
         return await self.get_role_detail(role_id, operation_context)
 
     @log_update_with_context("role")
+    @invalidate_role_permission_cache("role_id")
     async def remove_role_permissions(
         self, role_id: UUID, permission_ids: list[UUID], operation_context: OperationContext
     ) -> RoleDetailResponse:

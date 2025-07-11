@@ -162,6 +162,10 @@ class Settings(BaseSettings):
     REDIS_PASSWORD: SecretStr | None = None
     REDIS_DB: int = Field(default=0)
 
+    # 权限缓存配置
+    PERMISSION_CACHE_TTL: int = Field(default=600)
+    ENABLE_REDIS_CACHE: bool = Field(default=True)
+
     @property
     def REDIS_URI(self) -> str:
         """获取Redis URI
