@@ -46,11 +46,17 @@ app/
 ## ⚡ 快速开始
 
 ```bash
+# 创建环境
+uv venv --python 3.13
+
 # 安装依赖
 uv sync
 
-# 配置环境变量
+# 配置环境变量 (记得创建数据库，修改对应配置)
 cp .env.example .env
+
+# 初始化数据库
+aerich init-db
 
 # 初始化管理员用户、角色、权限 (环境变量文件可以修改初始化管理员账户的相关信息)
 uv run python manage_db.py init
@@ -135,5 +141,3 @@ class BaseModel(Model):
 ## 📄 许可证
 
 MIT License
-
-
