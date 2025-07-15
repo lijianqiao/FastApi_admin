@@ -6,6 +6,7 @@
 @Docs: 现代化权限管理 - 依赖注入为主导
 """
 
+import asyncio
 import functools
 from collections.abc import Callable
 from typing import Literal
@@ -132,20 +133,19 @@ class PermissionCache:
 
     async def invalidate_role_cache(self, role_id: UUID):
         """清除角色相关的所有用户权限缓存"""
-        cache_backend = await self._get_cache_backend()
-
-        # 由于无法直接知道哪些用户拥有这个角色，使用模式匹配删除
         try:
-            # 检查是否为Redis缓存后端（通过类名判断）
-            if cache_backend.__class__.__name__ == "RedisCache":
-                deleted_count = await cache_backend.delete_pattern("user:permissions:*")  # type: ignore
-                logger.info(f"角色权限变更，清除所有用户权限缓存，删除数量: {deleted_count}")
-            else:
-                # 内存缓存的情况
-                await cache_backend.clear_all()
-                logger.info("角色权限变更，清除所有内存权限缓存")
+            user_dao = UserDAO()
+            user_ids = await user_dao.get_user_ids_by_role(role_id)
+            if not user_ids:
+                logger.info(f"没有用户使用角色 {role_id}，无需清除缓存")
+                return
+            cache_backend = await self._get_cache_backend()
+            backend_type = cache_backend.__class__.__name__
+            tasks =  [self.invalidate_user_cache(user_id) for user_id in user_ids]
+            await asyncio.gather(*tasks)
+            logger.info(f"角色 {role_id} 相关的用户权限缓存清除完成，后端={backend_type}")
         except Exception as e:
-            logger.error(f"清除角色相关权限缓存失败: {e}")
+            logger.error(f"清除角色 {role_id} 相关的用户权限缓存失败: {e}")
 
     async def clear_all_cache(self):
         """清除所有权限缓存"""

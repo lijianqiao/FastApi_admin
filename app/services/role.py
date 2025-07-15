@@ -98,34 +98,26 @@ class RoleService(BaseService[Role]):
         self, query: RoleListRequest, operation_context: OperationContext
     ) -> tuple[list[RoleResponse], int]:
         """获取角色列表"""
-        filters = query.model_dump(exclude_unset=True, exclude={"page", "page_size", "sort_by", "sort_order"})
+        from app.utils.query_utils import list_query_to_orm_filters
 
-        # 处理业务参数
-        model_filters = {}
-        if "start_date" in filters:
-            model_filters["created_at__gte"] = filters.pop("start_date")
-        if "end_date" in filters:
-            model_filters["created_at__lte"] = filters.pop("end_date")
+        query_dict = query.model_dump(exclude_unset=True)
 
-        # 只保留模型字段
-        ROLE_MODEL_FIELDS = {
-            "id",
-            "role_code",
-            "role_name",
-            "description",
-            "is_active",
-            "created_at",
-            "updated_at",
-            "version",
-            "is_deleted",
-        }
-        for k in list(filters.keys()):
-            if k in ROLE_MODEL_FIELDS:
-                model_filters[k] = filters[k]
+        ROLE_MODEL_FIELDS = {"role_code", "is_active"}
+        search_fields = ["role_name", "description"]
+
+        model_filters, dao_params = list_query_to_orm_filters(query_dict, search_fields, ROLE_MODEL_FIELDS)
 
         order_by = [f"{'-' if query.sort_order == 'desc' else ''}{query.sort_by}"] if query.sort_by else ["-created_at"]
+
+        q_objects = model_filters.pop("q_objects", [])
+
         roles, total = await self.get_paginated_with_related(
-            page=query.page, page_size=query.page_size, order_by=order_by, **model_filters
+            page=query.page,
+            page_size=query.page_size,
+            order_by=order_by,
+            q_objects=q_objects,
+            **dao_params,
+            **model_filters,
         )
         return [RoleResponse.model_validate(role) for role in roles], total
 

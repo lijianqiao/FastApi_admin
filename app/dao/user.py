@@ -197,6 +197,16 @@ class UserDAO(BaseDAO[User]):
             logger.error(f"获取用户详细信息失败: {e}")
             return None
 
+    async def get_user_ids_by_role_id(self, role_id: UUID) -> list[UUID]:
+        """根据角色ID获取用户ID列表"""
+        try:
+            # This is a more ORM-friendly way than raw SQL
+            users = await self.model.filter(roles__id=role_id).values_list("id", flat=True)
+            return [user_id for (user_id,) in users]
+        except Exception as e:
+            logger.error(f"根据角色ID获取用户ID列表失败: {e}")
+            return []
+
     async def get_user_ids_by_role(self, role_id: UUID) -> list[UUID]:
         """根据角色ID获取用户ID列表"""
         # 这是一个用于性能的原始 SQL 查询，因为 ORM 对于多对多筛选可能很复杂。

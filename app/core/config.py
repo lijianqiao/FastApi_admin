@@ -231,7 +231,7 @@ class Settings(BaseSettings):
     @classmethod
     def validate_secret_key(cls, v: str) -> str:
         """验证SECRET_KEY不为空"""
-        if not v:
+        if not v or v == "your-secret-key":
             raise ValueError("Secret_key不能为空")
         if len(v) < 32:
             raise ValueError("Secret_key必须至少32个字符长")

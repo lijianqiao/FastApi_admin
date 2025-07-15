@@ -14,8 +14,6 @@ import sys
 
 from tortoise import Tortoise
 
-# # 添加项目根目录到Python路径
-# sys.path.insert(0, str(Path(__file__).parent))
 from app.core.config import settings
 from app.core.security import SecurityManager
 from app.dao.user import UserDAO

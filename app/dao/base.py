@@ -377,7 +377,8 @@ class BaseDAO[T: BaseModel]:
                 valid_filters["is_deleted"] = False
 
             # 构建查询
-            queryset = self.model.filter(**valid_filters)
+            q_objects = filters.pop("q_objects", [])
+            queryset = self.model.filter(*q_objects, **valid_filters)
 
             # 添加排序
             if order_by:
@@ -768,6 +769,9 @@ class BaseDAO[T: BaseModel]:
             # 计算偏移量
             offset = (page - 1) * page_size
 
+            # 从过滤器中提取Q对象
+            q_objects = filters.pop("q_objects", [])
+
             # 过滤掉None值，避免ORM查询异常
             valid_filters = {k: v for k, v in filters.items() if v is not None}
 
@@ -776,7 +780,7 @@ class BaseDAO[T: BaseModel]:
                 valid_filters["is_deleted"] = False
 
             # 构建查询
-            queryset = self.model.filter(**valid_filters)
+            queryset = self.model.filter(*q_objects, **valid_filters)
 
             # 添加关联查询优化
             if select_related:
@@ -789,7 +793,7 @@ class BaseDAO[T: BaseModel]:
                 queryset = queryset.order_by(*order_by)
 
             # 先执行计数查询（不包含关联，提高性能）
-            count_queryset = self.model.filter(**valid_filters)
+            count_queryset = self.model.filter(*q_objects, **valid_filters)
             total = await count_queryset.count()
 
             # 再执行分页查询（包含关联）

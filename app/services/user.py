@@ -121,39 +121,15 @@ class UserService(BaseService[User]):
         self, query: UserListRequest, operation_context: OperationContext
     ) -> tuple[list[UserResponse], int]:
         """获取用户列表"""
-        filters: dict[str, Any] = query.model_dump(
-            exclude_unset=True, exclude={"page", "page_size", "sort_by", "sort_order", "role_code"}
-        )
+        from app.utils.query_utils import list_query_to_orm_filters
 
-        # 处理业务参数
-        model_filters = {}
-        if "start_date" in filters:
-            model_filters["created_at__gte"] = filters.pop("start_date")
-        if "end_date" in filters:
-            model_filters["created_at__lte"] = filters.pop("end_date")
+        query_dict = query.model_dump(exclude_unset=True)
 
-        # 只保留模型字段
-        USER_MODEL_FIELDS = {
-            "id",
-            "username",
-            "password_hash",
-            "phone",
-            "nickname",
-            "avatar_url",
-            "bio",
-            "is_active",
-            "is_superuser",
-            "last_login_at",
-            "user_settings",
-            "description",
-            "created_at",
-            "updated_at",
-            "version",
-            "is_deleted",
-        }
-        for k in list(filters.keys()):
-            if k in USER_MODEL_FIELDS:
-                model_filters[k] = filters[k]
+        USER_MODEL_FIELDS = {"is_superuser", "is_active"}
+
+        search_fields = ["username", "phone", "nickname"]
+
+        model_filters, dao_params = list_query_to_orm_filters(query_dict, search_fields, USER_MODEL_FIELDS)
 
         if query.role_code:
             role = await self.role_dao.get_one(role_code=query.role_code)
@@ -169,8 +145,15 @@ class UserService(BaseService[User]):
             [f"-{query.sort_by}" if query.sort_order == "desc" else query.sort_by] if query.sort_by else ["-created_at"]
         )
 
+        q_objects = model_filters.pop("q_objects", [])
+
         users, total = await self.get_paginated_with_related(
-            page=query.page, page_size=query.page_size, order_by=order_by, **model_filters
+            page=query.page,
+            page_size=query.page_size,
+            order_by=order_by,
+            q_objects=q_objects,
+            **dao_params,
+            **model_filters,
         )
         return [UserResponse.model_validate(user) for user in users], total
 

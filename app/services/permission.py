@@ -88,44 +88,28 @@ class PermissionService(BaseService[Permission]):
         self, query: PermissionListRequest, operation_context: OperationContext
     ) -> tuple[list[PermissionResponse], int]:
         """获取权限列表"""
+        from app.utils.query_utils import list_query_to_orm_filters
 
-        filters = query.model_dump(exclude_unset=True, exclude={"page", "page_size", "sort_by", "sort_order"})
-        # 处理特殊参数
-        model_filters = {}
-        dao_params = {}
-        # 处理日期范围参数
-        if "start_date" in filters:
-            model_filters["created_at__gte"] = filters.pop("start_date")
-        if "end_date" in filters:
-            model_filters["created_at__lte"] = filters.pop("end_date")
+        query_dict = query.model_dump(exclude_unset=True)
 
-        # 处理软删除参数 - 这是DAO层参数，不是模型字段
-        if "include_deleted" in filters:
-            dao_params["include_deleted"] = filters.pop("include_deleted")
+        PERMISSION_MODEL_FIELDS = {"permission_type", "is_active"}
+        search_fields = ["permission_name", "permission_code", "description"]
 
-        # 只保留模型字段
-        PERMISSION_MODEL_FIELDS = {
-            "id",
-            "permission_code",
-            "permission_name",
-            "permission_type",
-            "description",
-            "is_active",
-            "created_at",
-            "updated_at",
-            "version",
-        }
-        for k in list(filters.keys()):
-            if k in PERMISSION_MODEL_FIELDS:
-                model_filters[k] = filters[k]
+        model_filters, dao_params = list_query_to_orm_filters(query_dict, search_fields, PERMISSION_MODEL_FIELDS)
+
         order_by = [f"{'-' if query.sort_order == 'desc' else ''}{query.sort_by}"] if query.sort_by else ["-created_at"]
+
+        q_objects = model_filters.pop("q_objects", [])
+
         permissions, total = await self.get_paginated_with_related(
             page=query.page,
             page_size=query.page_size,
             order_by=order_by,
-            **dao_params,  # 传递DAO参数
-            **model_filters,  # 传递模型过滤条件
+            q_objects=q_objects,
+            **dao_params,
+            **model_filters,
         )
+
         if not permissions:
             return [], 0
         result = [PermissionResponse.model_validate(p) for p in permissions]
