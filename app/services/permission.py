@@ -66,8 +66,11 @@ class PermissionService(BaseService[Permission]):
     ) -> PermissionResponse:
         """更新权限"""
         update_data = request.model_dump(exclude_unset=True)
-        update_data["updater_id"] = operation_context.user.id
-        version = getattr(request, "version", None)
+
+        version = update_data.pop("version", None)
+        if version is None:
+            raise BusinessException("更新请求必须包含 version 字段。")
+
         updated_permission = await self.update(
             permission_id, operation_context=operation_context, version=version, **update_data
         )
@@ -126,7 +129,7 @@ class PermissionService(BaseService[Permission]):
         self, permission_id: UUID, operation_context: OperationContext
     ) -> PermissionResponse:
         """根据ID获取权限详情"""
-        permission = await self.dao.get_by_id(permission_id)
+        permission = await self.dao.get_by_id(permission_id, include_deleted=False)
         if not permission:
             raise BusinessException("权限未找到")
         return PermissionResponse.model_validate(permission)

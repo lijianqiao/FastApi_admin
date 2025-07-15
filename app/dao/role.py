@@ -95,7 +95,7 @@ class RoleDAO(BaseDAO[Role]):
         适用于UI保存操作。
         """
         try:
-            role = await self.get_by_id(role_id)
+            role = await self.get_with_related(role_id, prefetch_related=["permissions"])
             if not role:
                 logger.warning(f"设置权限时角色未找到: {role_id}")
                 return

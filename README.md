@@ -67,6 +67,15 @@ uv run python start.py
 
 访问: http://127.0.0.1:8000/api/docs
 
+## 🧪 测试
+
+项目包含一套完整的测试用例，覆盖了核心的 API 端点和业务逻辑。
+
+```bash
+# 运行所有测试
+pytest
+```
+
 ## � 权限系统
 
 ### RBAC 模型

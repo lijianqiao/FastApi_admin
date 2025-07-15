@@ -37,6 +37,7 @@ class RoleCreateRequest(BaseModel):
 class RoleUpdateRequest(BaseModel):
     """更新角色请求"""
 
+    version: int = Field(description="数据版本号，用于乐观锁校验")
     role_name: str | None = Field(default=None, description="角色名称", min_length=2, max_length=50)
     description: str | None = Field(default=None, description="角色描述", max_length=200)
     is_active: bool | None = Field(default=None, description="是否激活")

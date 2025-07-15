@@ -10,7 +10,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from app.schemas.base import BaseResponse, ListQueryRequest, ORMBase, PaginatedResponse
+from app.schemas.base import BaseRequest, BaseResponse, ListQueryRequest, ORMBase, PaginatedResponse
 from app.schemas.permission import PermissionResponse
 from app.schemas.role import RoleResponse
 from app.schemas.types import ObjectUUID
@@ -39,9 +39,10 @@ class UserCreateRequest(BaseModel):
     role_ids: list[ObjectUUID] = Field(default_factory=list, description="角色ID列表")
 
 
-class UserUpdateRequest(BaseModel):
+class UserUpdateRequest(BaseRequest):
     """更新用户请求"""
 
+    version: int = Field(description="数据版本号，用于乐观锁校验")
     phone: str | None = Field(default=None, description="手机号", max_length=20)
     nickname: str | None = Field(default=None, description="昵称", max_length=100)
     avatar_url: str | None = Field(default=None, description="头像URL", max_length=500)

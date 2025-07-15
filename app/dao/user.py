@@ -11,7 +11,7 @@ from typing import Any
 from uuid import UUID
 
 from tortoise.expressions import Q
-
+from app.dao.permission import PermissionDAO
 from app.dao.base import BaseDAO
 from app.models.user import User
 from app.utils.logger import logger
@@ -22,6 +22,7 @@ class UserDAO(BaseDAO[User]):
 
     def __init__(self):
         super().__init__(User)
+        self.permission_dao = PermissionDAO()
 
     async def get_by_username(self, username: str) -> User | None:
         """根据用户名获取用户"""
@@ -216,17 +217,13 @@ class UserDAO(BaseDAO[User]):
         return [row["user_id"] for row in results]
 
     # 用户-角色关系管理
-    async def set_user_roles(self, user_id: UUID, role_ids: list[UUID]) -> None:
+    async def set_user_roles(self, user: User, role_ids: list[UUID]) -> None:
         """
         【全量设置】用户的角色，先清空再添加。
         适用于UI保存操作。
         """
         try:
-            user = await self.get_by_id(user_id)
-            if not user:
-                logger.warning(f"设置角色时用户未找到: {user_id}")
-                return
-
+            # user 对象由服务层传入，并已预加载 roles
             from app.dao.role import RoleDAO
 
             role_dao = RoleDAO()
@@ -236,7 +233,7 @@ class UserDAO(BaseDAO[User]):
                 await user.roles.add(*roles)
             logger.info(f"成功为用户 '{user.username}' 设置了 {len(roles)} 个角色。")
         except Exception as e:
-            logger.error(f"为用户 {user_id} 设置角色失败: {e}")
+            logger.error(f"为用户 {user.id} 设置角色失败: {e}")
 
     async def add_user_roles(self, user_id: UUID, role_ids: list[UUID]) -> None:
         """【增量添加】角色到用户。"""
@@ -292,25 +289,26 @@ class UserDAO(BaseDAO[User]):
     # 用户-权限关系管理
     async def set_user_permissions(self, user_id: UUID, permission_ids: list[UUID]) -> None:
         """
-        【全量设置】用户的权限，先清空再添加。
-        适用于UI保存操作。
+        【全量设置】用户的权限（原子操作）。
         """
+        from tortoise.transactions import in_transaction
         try:
-            user = await self.get_by_id(user_id)
-            if not user:
-                logger.warning(f"设置权限时用户未找到: {user_id}")
-                return
+            async with in_transaction():
+                user = await self.get_by_id(user_id)
+                if not user:
+                    logger.warning(f"设置权限时用户未找到: {user_id}")
+                    return
 
-            from app.dao.permission import PermissionDAO
-
-            permission_dao = PermissionDAO()
-            permissions = await permission_dao.get_by_ids(permission_ids)
-            await user.permissions.clear()
-            if permissions:
-                await user.permissions.add(*permissions)
-            logger.info(f"成功为用户 '{user.username}' 设置了 {len(permissions)} 个权限。")
+                await user.permissions.clear()
+                if permission_ids:
+                    permissions = await self.permission_dao.get_by_ids(permission_ids)
+                    if permissions:
+                        await user.permissions.add(*permissions)
+                
+                logger.info(f"成功为用户 '{user.username}' 设置了 {len(permission_ids)} 个权限。")
         except Exception as e:
             logger.error(f"为用户 {user_id} 设置权限失败: {e}")
+            raise
 
     async def add_user_permissions(self, user_id: UUID, permission_ids: list[UUID]) -> None:
         """【增量添加】权限到用户。"""
@@ -320,10 +318,7 @@ class UserDAO(BaseDAO[User]):
                 logger.warning(f"添加权限时用户未找到: {user_id}")
                 return
 
-            from app.dao.permission import PermissionDAO
-
-            permission_dao = PermissionDAO()
-            permissions = await permission_dao.get_by_ids(permission_ids)
+            permissions = await self.permission_dao.get_by_ids(permission_ids)
             if permissions:
                 await user.permissions.add(*permissions)
             logger.info(f"成功为用户 '{user.username}' 添加了 {len(permissions)} 个权限。")
@@ -338,10 +333,7 @@ class UserDAO(BaseDAO[User]):
                 logger.warning(f"移除权限时用户未找到: {user_id}")
                 return
 
-            from app.dao.permission import PermissionDAO
-
-            permission_dao = PermissionDAO()
-            permissions = await permission_dao.get_by_ids(permission_ids)
+            permissions = await self.permission_dao.get_by_ids(permission_ids)
             if permissions:
                 await user.permissions.remove(*permissions)
             logger.info(f"成功从用户 '{user.username}' 移除了 {len(permissions)} 个权限。")

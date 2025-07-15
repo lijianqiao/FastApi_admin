@@ -9,7 +9,7 @@
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from app.schemas.types import ObjectUUID
@@ -27,11 +27,7 @@ class BaseResponse[DataType](BaseModel):
 class BaseRequest(BaseModel):
     """基础请求模式"""
 
-    class Config:
-        extra = "forbid"
-        use_enum_values = True
-        alias_generator = to_camel  # 驼峰
-        populate_by_name = True  # 允许通过字段名和别名同时赋值
+    model_config = ConfigDict(extra="forbid", use_enum_values=True, alias_generator=to_camel, populate_by_name=True)
 
 
 class ORMBase(BaseRequest):
@@ -45,8 +41,7 @@ class ORMBase(BaseRequest):
     created_at: datetime
     updated_at: datetime
 
-    class Config(BaseRequest.Config):
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PaginationRequest(BaseModel):
@@ -55,8 +50,7 @@ class PaginationRequest(BaseModel):
     page: int = Field(default=1, ge=1, description="页码")
     page_size: int = Field(default=10, ge=1, le=100, description="每页大小")
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class SoftDeleteRequest(BaseModel):
@@ -64,8 +58,7 @@ class SoftDeleteRequest(BaseModel):
 
     include_deleted: bool = Field(default=False, description="是否包含已删除的数据")
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class RestoreRequest(BaseModel):
@@ -73,8 +66,7 @@ class RestoreRequest(BaseModel):
 
     ids: list[ObjectUUID] = Field(description="要恢复的ID列表", min_length=1)
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class BulkDeleteRequest(BaseModel):
@@ -83,8 +75,7 @@ class BulkDeleteRequest(BaseModel):
     ids: list[ObjectUUID] = Field(description="要删除的ID列表", min_length=1)
     hard_delete: bool = Field(default=False, description="是否硬删除")
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class PaginatedResponse[DataType](BaseModel):
@@ -156,8 +147,7 @@ class SearchRequest(BaseModel):
 
     keyword: str | None = Field(default=None, description="搜索关键词", max_length=100)
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class FilterRequest(BaseModel):
@@ -167,8 +157,7 @@ class FilterRequest(BaseModel):
     start_date: datetime | None = Field(default=None, description="开始时间")
     end_date: datetime | None = Field(default=None, description="结束时间")
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class SortRequest(BaseModel):
@@ -177,8 +166,7 @@ class SortRequest(BaseModel):
     sort_by: str | None = Field(default=None, description="排序字段")
     sort_order: Literal["asc", "desc"] = Field(default="desc", description="排序方向")
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class ListQueryRequest(PaginationRequest, SearchRequest, FilterRequest, SortRequest):
@@ -186,8 +174,7 @@ class ListQueryRequest(PaginationRequest, SearchRequest, FilterRequest, SortRequ
 
     include_deleted: bool = Field(default=False, description="是否包含已删除数据")
 
-    class Config:  # type: ignore
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class StatusUpdateRequest(BaseModel):
@@ -195,8 +182,7 @@ class StatusUpdateRequest(BaseModel):
 
     is_active: bool = Field(description="激活状态")
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class PasswordUpdateRequest(BaseModel):
@@ -206,8 +192,7 @@ class PasswordUpdateRequest(BaseModel):
     new_password: str = Field(description="新密码", min_length=6, max_length=128)
     confirm_password: str = Field(description="确认密码", min_length=6, max_length=128)
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class BulkAssignRequest(BaseModel):
@@ -216,8 +201,7 @@ class BulkAssignRequest(BaseModel):
     target_ids: list[ObjectUUID] = Field(description="目标ID列表", min_length=1)
     assign_ids: list[ObjectUUID] = Field(description="分配的ID列表", min_length=0)
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class TreeQueryRequest(BaseModel):
@@ -227,8 +211,7 @@ class TreeQueryRequest(BaseModel):
     include_children: bool = Field(default=True, description="是否包含子节点")
     max_depth: int | None = Field(default=None, ge=1, le=10, description="最大深度")
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class TreeResponse[NodeType](BaseModel):
@@ -264,8 +247,7 @@ class AuthRequest(BaseModel):
     username: str = Field(description="用户名", min_length=3, max_length=50)
     password: str = Field(description="密码", min_length=6, max_length=128)
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class BatchOperationRequest(BaseModel):
@@ -275,5 +257,4 @@ class BatchOperationRequest(BaseModel):
     operation: str = Field(description="操作类型")
     params: dict[str, Any] | None = Field(default=None, description="操作参数")
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")

@@ -87,11 +87,11 @@ class UserService(BaseService[User]):
         self, user_id: UUID, request: UserUpdateRequest, operation_context: OperationContext
     ) -> UserResponse:
         """更新用户信息"""
-        current_user = operation_context.user
         update_data = request.model_dump(exclude_unset=True)
-        update_data["updater_id"] = current_user.id
-        # 此处需要传递 version, 假设它从 request 中来
-        version = getattr(request, "version", None)
+        
+        version = update_data.pop("version", None)
+        if version is None:
+            raise BusinessException("更新请求必须包含 version 字段。")
 
         updated_user = await self.update(user_id, operation_context=operation_context, version=version, **update_data)
         if not updated_user:
@@ -107,7 +107,10 @@ class UserService(BaseService[User]):
     @log_query_with_context("user")
     async def get_user_detail(self, user_id: UUID, operation_context: OperationContext) -> UserDetailResponse:
         """获取用户详情，包含角色和所有权限"""
-        user = await self.dao.get_user_with_details(user_id)
+        # 确保不返回软删除的用户
+        user = await self.dao.get_with_related(
+            user_id, prefetch_related=["roles", "permissions"], include_deleted=False
+        )
         if not user:
             raise BusinessException("用户未找到")
 
@@ -169,10 +172,15 @@ class UserService(BaseService[User]):
         current_user = operation_context.user
         if current_user.id == user_id:
             raise BusinessException("不能修改自己的状态")
+        
+        user_to_update = await self.dao.get_by_id(user_id)
+        if not user_to_update:
+            raise BusinessException("用户未找到")
+
         await self.update(
             user_id,
             operation_context=operation_context,
-            updater_id=current_user.id,
+            version=user_to_update.version,
             is_active=is_active,
         )
 
@@ -181,12 +189,13 @@ class UserService(BaseService[User]):
         self, user_id: UUID, role_ids: list[UUID], operation_context: OperationContext
     ) -> UserDetailResponse:
         """为用户分配角色（全量设置）"""
-        user = await self.dao.get_by_id(user_id)
+        # 在服务层确保预加载关系，这是最可靠的位置
+        user = await self.dao.get_with_related(user_id, prefetch_related=["roles"])
         if not user:
             raise BusinessException("用户未找到")
 
-        # 使用 DAO 层的全量设置方法
-        await self.dao.set_user_roles(user_id, role_ids)
+        # 现在 user.roles 已经被加载，可以安全地将 user 对象传递给 DAO 层
+        await self.dao.set_user_roles(user, role_ids)
         return await self.get_user_detail(user_id, operation_context)
 
     @invalidate_user_permission_cache("user_id")
@@ -227,11 +236,6 @@ class UserService(BaseService[User]):
         self, user_id: UUID, request: UserAssignPermissionsRequest, operation_context: OperationContext
     ) -> UserDetailResponse:
         """为用户分配直接权限（全量设置）"""
-        user = await self.dao.get_by_id(user_id)
-        if not user:
-            raise BusinessException("用户未找到")
-
-        # 使用 DAO 层的全量设置方法
         await self.dao.set_user_permissions(user_id, request.permission_ids)
         return await self.get_user_detail(user_id, operation_context)
 
@@ -268,31 +272,30 @@ class UserService(BaseService[User]):
         permissions = await self.dao.get_user_permissions(user_id)
         return [PermissionResponse.model_validate(perm) for perm in permissions]
 
+    async def get_users_by_role_id(self, role_id: UUID, operation_context: OperationContext) -> list[UserResponse]:
+        """根据角色ID获取用户列表"""
+        users = await self.dao.find_by_fields(roles__id=role_id, include_deleted=False)
+        return [UserResponse.model_validate(user) for user in users]
+
     async def _get_user_permissions(self, user: User) -> set[Permission]:
-        """获取用户的所有权限，包括直接权限和通过角色继承的权限"""
+        """获取用户的所有权限，包括直接权限和通过角色继承的权限。"""
         if user.is_superuser:
-            all_perms = await self.permission_dao.get_all()
-            return set(all_perms)
+            return set(await self.permission_dao.get_all())
 
-        # 获取直接权限
-        direct_permissions = set()
-        try:
-            direct_permissions = set(user.permissions)
-        except NoValuesFetched:
-            await user.fetch_related("permissions")
-            direct_permissions = set(user.permissions)
+        # 为确保数据最新，重新获取用户并预加载所有需要的嵌套关系
+        fresh_user = await self.dao.get_with_related(
+            user.id, prefetch_related=["permissions", "roles__permissions"]
+        )
+        if not fresh_user:
+            return set()
 
-        # 获取通过角色继承的权限
+        # 收集直接权限
+        direct_permissions = set(fresh_user.permissions)
+
+        # 收集通过角色继承的权限
         role_permissions = set()
-        for role in user.roles:
-            # 检查权限关联是否已加载，如果没有则加载
-            try:
-                # 尝试访问权限，如果没有加载会抛出异常
-                _ = role.permissions
-            except NoValuesFetched:
-                # 如果权限未加载，则预加载
-                await role.fetch_related("permissions")
-
+        for role in fresh_user.roles:
+            # "roles__permissions" 预加载确保了 role.permissions 已被加载
             role_permissions.update(role.permissions)
 
         return direct_permissions.union(role_permissions)

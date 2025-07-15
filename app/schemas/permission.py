@@ -32,6 +32,7 @@ class PermissionCreateRequest(BaseModel):
 class PermissionUpdateRequest(BaseModel):
     """更新权限请求"""
 
+    version: int = Field(description="数据版本号，用于乐观锁校验")
     permission_name: str | None = Field(default=None, description="权限名称", min_length=2, max_length=100)
     permission_type: str | None = Field(default=None, description="权限类型", max_length=50)
     description: str | None = Field(default=None, description="权限描述", max_length=200)

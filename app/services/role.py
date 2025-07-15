@@ -74,8 +74,11 @@ class RoleService(BaseService[Role]):
     ) -> RoleResponse:
         """更新角色"""
         update_data = request.model_dump(exclude_unset=True)
-        update_data["updater_id"] = operation_context.user.id
-        version = getattr(request, "version", None)
+
+        version = update_data.pop("version", None)
+        if version is None:
+            raise BusinessException("更新请求必须包含 version 字段。")
+
         updated_role = await self.update(role_id, operation_context=operation_context, version=version, **update_data)
         if not updated_role:
             raise BusinessException("角色更新失败或版本冲突")
@@ -124,7 +127,7 @@ class RoleService(BaseService[Role]):
     @log_query_with_context("role")
     async def get_role_detail(self, role_id: UUID, operation_context: OperationContext) -> RoleDetailResponse:
         """获取带权限的角色详情"""
-        role = await self.dao.get_with_related(role_id, prefetch_related=["permissions"])
+        role = await self.dao.get_with_related(role_id, prefetch_related=["permissions"], include_deleted=False)
         if not role:
             raise BusinessException("角色未找到")
         return RoleDetailResponse.model_validate(role)
@@ -197,4 +200,7 @@ class RoleService(BaseService[Role]):
     @log_update_with_context("role")
     async def update_role_status(self, role_id: UUID, is_active: bool, operation_context: OperationContext) -> None:
         """更新角色状态"""
-        await self.update(role_id, is_active=is_active, operation_context=operation_context)
+        role = await self.dao.get_by_id(role_id)
+        if not role:
+            raise BusinessException("角色未找到")
+        await self.update(role_id, operation_context=operation_context, version=role.version, is_active=is_active)

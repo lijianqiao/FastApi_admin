@@ -180,9 +180,12 @@ async def batch_enable_users(
     success_count = 0
     for user_id in user_ids:
         try:
+            user = await user_service.get_by_id(user_id)
+            if not user:
+                continue
             from app.schemas.user import UserUpdateRequest
 
-            update_request = UserUpdateRequest(is_active=True)
+            update_request = UserUpdateRequest(is_active=True, version=user.version)
             await user_service.update_user(user_id, update_request, operation_context)
             success_count += 1
         except Exception:
@@ -202,9 +205,12 @@ async def batch_disable_users(
     success_count = 0
     for user_id in user_ids:
         try:
+            user = await user_service.get_by_id(user_id)
+            if not user:
+                continue
             from app.schemas.user import UserUpdateRequest
 
-            update_request = UserUpdateRequest(is_active=False)
+            update_request = UserUpdateRequest(is_active=False, version=user.version)
             await user_service.update_user(user_id, update_request, operation_context)
             success_count += 1
         except Exception:

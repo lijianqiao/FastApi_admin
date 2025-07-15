@@ -84,7 +84,7 @@ async def get_users_by_role(
     operation_context: OperationContext = Depends(require_permission(Permissions.USER_READ)),
 ):
     """获取拥有指定角色的所有用户"""
-    return await user_service.get_user_roles(role_id, operation_context)
+    return await user_service.get_users_by_role_id(role_id, operation_context)
 
 
 @router.get("/permissions/{permission_id}/users", response_model=list[UserResponse], summary="获取权限下的所有用户")

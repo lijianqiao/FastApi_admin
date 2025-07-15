@@ -17,11 +17,11 @@ class BaseModel(Model):
     基础模型，所有模型的基类
     """
 
-    id = fields.UUIDField(pk=True, default=uuid.uuid4)
+    id = fields.UUIDField(primary_key=True, default=uuid.uuid4)
     version = fields.IntField(default=1, description="乐观锁版本号")
     created_at = fields.DatetimeField(auto_now_add=True, description="创建时间")
     updated_at = fields.DatetimeField(auto_now=True, description="更新时间")
-    is_deleted = fields.BooleanField(default=False, description="软删除标志")
+    is_deleted = fields.BooleanField(default=False, db_index=True, description="软删除标志")
 
     class Meta:  # type: ignore
         abstract = True
