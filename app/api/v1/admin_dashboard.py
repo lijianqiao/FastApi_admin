@@ -6,7 +6,7 @@
 @Docs: 后台管理系统仪表板API - 统计数据和系统监控
 """
 
-from datetime import date
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -57,7 +57,7 @@ async def get_dashboard_stats(
         PermissionListRequest(page=1, page_size=1), operation_context
     )
     # 获取今天的操作日志数量
-    today = date.today()
+    today = datetime.now()
     today_logs_request = OperationLogListRequest(page=1, page_size=1, start_date=today, end_date=today)
     today_logs, today_operations = await operation_log_service.get_logs(today_logs_request, operation_context)
 
