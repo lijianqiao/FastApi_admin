@@ -141,7 +141,7 @@ class PermissionCache:
                 return
             cache_backend = await self._get_cache_backend()
             backend_type = cache_backend.__class__.__name__
-            tasks =  [self.invalidate_user_cache(user_id) for user_id in user_ids]
+            tasks = [self.invalidate_user_cache(user_id) for user_id in user_ids]
             await asyncio.gather(*tasks)
             logger.info(f"角色 {role_id} 相关的用户权限缓存清除完成，后端={backend_type}")
         except Exception as e:
