@@ -9,7 +9,7 @@
 import asyncio
 import functools
 from collections.abc import Callable
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import Depends
@@ -59,8 +59,16 @@ class PermissionCache:
 
             return _memory_fallback
 
-    async def get_user_permissions(self, user_id: UUID) -> set[str]:
-        """获取用户权限（含缓存）"""
+    async def get_user_permissions(self, user_id: UUID, context: dict[str, Any] | None = None) -> set[str]:
+        """获取用户权限（含缓存）
+
+        Args:
+            user_id: 用户ID
+            context: 上下文信息，用于动态TTL计算
+
+        Returns:
+            set[str]: 用户权限集合
+        """
         cache_key = f"user:permissions:{user_id}"
         cache_backend = await self._get_cache_backend()
         backend_type = cache_backend.__class__.__name__
@@ -76,11 +84,12 @@ class PermissionCache:
         logger.info(f"权限缓存未命中: 用户={user_id}, 后端={backend_type}, 从数据库加载")
         permissions = await self._fetch_user_permissions(user_id)
 
-        # 存入缓存
-        success = await cache_backend.set(cache_key, permissions, self.cache_ttl)
+        # 使用动态TTL存入缓存
+        ttl = await self._get_dynamic_ttl(context)
+        success = await cache_backend.set(cache_key, permissions, ttl)
         if success:
             logger.info(
-                f"权限缓存设置成功: 用户={user_id}, 后端={backend_type}, 权限数量={len(permissions)}, TTL={self.cache_ttl}秒"
+                f"权限缓存设置成功: 用户={user_id}, 后端={backend_type}, 权限数量={len(permissions)}, TTL={ttl}秒"
             )
             logger.debug(f"新缓存权限详情: {permissions}")
         else:
@@ -152,6 +161,43 @@ class PermissionCache:
         cache_backend = await self._get_cache_backend()
         await cache_backend.clear_all()
         logger.info("所有权限缓存已清除")
+
+    async def _get_dynamic_ttl(self, context: dict[str, Any] | None = None) -> int:
+        """获取动态TTL.
+
+        Args:
+            context: 上下文信息
+
+        Returns:
+            int: 动态计算的TTL（秒）
+        """
+        try:
+            # 延迟导入避免循环依赖
+            from app.services.cache_service import CacheScenario, cache_manager
+
+            return cache_manager.get_dynamic_ttl(CacheScenario.USER_PERMISSIONS, context)
+        except ImportError:
+            # 如果缓存服务不可用，使用默认TTL
+            logger.warning("缓存服务不可用，使用默认TTL")
+            return self.cache_ttl
+
+    async def update_cache_ttl(self, user_id: UUID, context: dict[str, Any] | None = None) -> bool:
+        """更新用户权限缓存的TTL.
+
+        Args:
+            user_id: 用户ID
+            context: 上下文信息
+
+        Returns:
+            bool: 更新是否成功
+        """
+        try:
+            from app.services.cache_service import cache_manager
+
+            return await cache_manager.update_permission_cache_ttl(user_id, context)
+        except ImportError:
+            logger.warning("缓存服务不可用，无法更新TTL")
+            return False
 
     async def get_cache_stats(self) -> dict:
         """获取缓存统计信息"""

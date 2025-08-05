@@ -14,7 +14,7 @@ from app.core.permissions.simple_decorators import (
     Permissions,
     require_permission,
 )
-from app.schemas.base import SuccessResponse
+from app.schemas.base import BaseResponse, SuccessResponse
 from app.schemas.permission import (
     PermissionCreateRequest,
     PermissionListRequest,
@@ -35,32 +35,36 @@ async def list_permissions(
     operation_context: OperationContext = Depends(require_permission(Permissions.PERMISSION_READ)),
 ):
     """获取权限列表（分页），支持搜索和筛选"""
-    permissions, total = await service.get_permissions(query, operation_context=operation_context)
+    permissions, total = await service.get_permissions(query, _operation_context=operation_context)
     response = PermissionListResponse(data=permissions, total=total, page=query.page, page_size=query.page_size)
     return response
 
 
-@router.get("/{permission_id}", response_model=PermissionResponse, summary="获取权限详情")
+@router.get("/{permission_id}", response_model=BaseResponse[PermissionResponse], summary="获取权限详情")
 async def get_permission(
     permission_id: UUID,
     service: PermissionService = Depends(get_permission_service),
     operation_context: OperationContext = Depends(require_permission(Permissions.PERMISSION_READ)),
 ):
     """获取权限详情"""
-    return await service.get_permission_detail(permission_id, operation_context=operation_context)
+    permission = await service.get_permission_detail(permission_id, _operation_context=operation_context)
+    return BaseResponse(data=permission)
 
 
-@router.post("", response_model=PermissionResponse, status_code=status.HTTP_201_CREATED, summary="创建权限")
+@router.post(
+    "", response_model=BaseResponse[PermissionResponse], status_code=status.HTTP_201_CREATED, summary="创建权限"
+)
 async def create_permission(
     permission_data: PermissionCreateRequest,
     service: PermissionService = Depends(get_permission_service),
     operation_context: OperationContext = Depends(require_permission(Permissions.PERMISSION_CREATE)),
 ):
     """创建新权限"""
-    return await service.create_permission(permission_data, operation_context=operation_context)
+    permission = await service.create_permission(permission_data, operation_context=operation_context)
+    return BaseResponse(data=permission, message="权限创建成功")
 
 
-@router.put("/{permission_id}", response_model=PermissionResponse, summary="更新权限")
+@router.put("/{permission_id}", response_model=BaseResponse[PermissionResponse], summary="更新权限")
 async def update_permission(
     permission_id: UUID,
     permission_data: PermissionUpdateRequest,
@@ -68,7 +72,8 @@ async def update_permission(
     operation_context: OperationContext = Depends(require_permission(Permissions.PERMISSION_UPDATE)),
 ):
     """更新权限信息"""
-    return await service.update_permission(permission_id, permission_data, operation_context=operation_context)
+    permission = await service.update_permission(permission_id, permission_data, operation_context=operation_context)
+    return BaseResponse(data=permission, message="权限更新成功")
 
 
 @router.delete("/{permission_id}", response_model=SuccessResponse, summary="删除权限")
@@ -90,5 +95,5 @@ async def update_permission_status(
     operation_context: OperationContext = Depends(require_permission(Permissions.PERMISSION_UPDATE)),
 ):
     """更新权限状态"""
-    await service.update_permission_status(permission_id, is_active, operation_context=operation_context)
+    await service.update_permission_status(permission_id, is_active=is_active, operation_context=operation_context)
     return SuccessResponse()

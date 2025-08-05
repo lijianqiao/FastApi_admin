@@ -40,6 +40,8 @@ class OperationLogListRequest(ListQueryRequest):
     keyword: str | None = Field(default=None, description="关键字（模块/动作/路径/IP）")
     username: str | None = Field(default=None, description="按用户名模糊搜索")
     status: str | None = Field(default=None, description="状态（success/fail）")
+    start_date: date | None = Field(default=None, description="开始日期")
+    end_date: date | None = Field(default=None, description="结束日期")
 
 
 class OperationLogListResponse(PaginatedResponse[OperationLogResponse]):

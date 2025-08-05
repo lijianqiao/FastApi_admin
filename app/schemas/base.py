@@ -7,7 +7,7 @@
 """
 
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
@@ -61,21 +61,7 @@ class SoftDeleteRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class RestoreRequest(BaseModel):
-    """恢复请求模式"""
-
-    ids: list[ObjectUUID] = Field(description="要恢复的ID列表", min_length=1)
-
-    model_config = ConfigDict(extra="forbid")
-
-
-class BulkDeleteRequest(BaseModel):
-    """批量删除请求模式"""
-
-    ids: list[ObjectUUID] = Field(description="要删除的ID列表", min_length=1)
-    hard_delete: bool = Field(default=False, description="是否硬删除")
-
-    model_config = ConfigDict(extra="forbid")
+# 已移除未使用的 RestoreRequest 和 BulkDeleteRequest 模型
 
 
 class PaginatedResponse[DataType](BaseModel):
@@ -115,23 +101,10 @@ class ErrorResponse(BaseModel):
     detail: Any = Field(default=None, description="错误详情")
 
 
-class SoftDeletedDataResponse[DataType](BaseModel):
-    """软删除数据响应"""
-
-    active_data: list[DataType] = Field(default_factory=list, description="活跃数据")
-    deleted_data: list[DataType] = Field(default_factory=list, description="已删除数据")
-    active_count: int = Field(default=0, description="活跃数据数量")
-    deleted_count: int = Field(default=0, description="已删除数据数量")
+# 已移除未使用的 SoftDeletedDataResponse 模型
 
 
-class OperationResponse(BaseModel):
-    """操作结果响应"""
-
-    code: int = Field(default=200, description="响应代码")
-    message: str = Field(default="操作成功", description="响应消息")
-    success_count: int = Field(default=0, description="成功数量")
-    failed_count: int = Field(default=0, description="失败数量")
-    failed_items: list[dict[str, Any]] = Field(default_factory=list, description="失败项详情")
+# 已移除未使用的 OperationResponse 模型
 
 
 # 常用响应类型
@@ -150,29 +123,15 @@ class SearchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class FilterRequest(BaseModel):
-    """筛选请求基类"""
-
-    is_active: bool | None = Field(default=None, description="是否激活")
-    start_date: datetime | None = Field(default=None, description="开始时间")
-    end_date: datetime | None = Field(default=None, description="结束时间")
-
-    model_config = ConfigDict(extra="forbid")
+# 已移除未使用的 FilterRequest 和 SortRequest 模型
 
 
-class SortRequest(BaseModel):
-    """排序请求基类"""
-
-    sort_by: str | None = Field(default=None, description="排序字段")
-    sort_order: Literal["asc", "desc"] = Field(default="desc", description="排序方向")
-
-    model_config = ConfigDict(extra="forbid")
-
-
-class ListQueryRequest(PaginationRequest, SearchRequest, FilterRequest, SortRequest):
+class ListQueryRequest(PaginationRequest, SearchRequest):
     """通用列表查询请求（组合分页、搜索、筛选、排序）"""
 
     include_deleted: bool = Field(default=False, description="是否包含已删除数据")
+    sort_by: str | None = Field(default=None, description="排序字段")
+    sort_order: str = Field(default="desc", description="排序方向", pattern="^(asc|desc)$")
 
     model_config = ConfigDict(extra="forbid")
 
@@ -204,32 +163,10 @@ class BulkAssignRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class TreeQueryRequest(BaseModel):
-    """树形查询请求"""
-
-    parent_id: ObjectUUID | None = Field(default=None, description="父节点ID")
-    include_children: bool = Field(default=True, description="是否包含子节点")
-    max_depth: int | None = Field(default=None, ge=1, le=10, description="最大深度")
-
-    model_config = ConfigDict(extra="forbid")
+# 已移除未使用的 TreeQueryRequest 和 TreeResponse 模型
 
 
-class TreeResponse[NodeType](BaseModel):
-    """树形结构响应"""
-
-    code: int = Field(default=200, description="响应代码")
-    message: str = Field(default="成功", description="响应消息")
-    data: list[NodeType] = Field(default_factory=list, description="树形数据")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="响应时间")
-
-
-class StatisticsResponse(BaseModel):
-    """统计数据响应"""
-
-    code: int = Field(default=200, description="响应代码")
-    message: str = Field(default="成功", description="响应消息")
-    data: dict[str, Any] = Field(default_factory=dict, description="统计数据")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="响应时间")
+# 已移除未使用的 StatisticsResponse 模型
 
 
 class TokenResponse(BaseModel):
@@ -250,11 +187,4 @@ class AuthRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class BatchOperationRequest(BaseModel):
-    """批量操作请求基类"""
-
-    ids: list[ObjectUUID] = Field(description="操作对象ID列表", min_length=1)
-    operation: str = Field(description="操作类型")
-    params: dict[str, Any] | None = Field(default=None, description="操作参数")
-
-    model_config = ConfigDict(extra="forbid")
+# 已移除未使用的 BatchOperationRequest 模型

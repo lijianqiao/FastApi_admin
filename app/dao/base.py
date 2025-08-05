@@ -10,11 +10,18 @@ import asyncio
 from typing import Any, TypeVar
 from uuid import UUID
 
-from tortoise.exceptions import DoesNotExist
+from tortoise.exceptions import DoesNotExist, IntegrityError
 from tortoise.queryset import QuerySet
 from tortoise.transactions import in_transaction
 
-from app.core.exceptions import VersionConflictError
+from app.core.exceptions import (
+    DatabaseConnectionException,
+    DatabaseTransactionException,
+    DuplicateRecordException,
+    RecordNotFoundException,
+    ValidationException,
+    VersionConflictError,
+)
 from app.models.base import BaseModel
 from app.utils.logger import logger
 
@@ -28,7 +35,7 @@ class BaseDAO[T: BaseModel]:
     def __init__(self, model: type[T]):
         self.model = model
 
-    async def get_by_id(self, id: UUID, include_deleted: bool = True) -> T | None:
+    async def get_by_id(self, id: UUID, include_deleted: bool = True) -> T:
         """根据ID获取单个对象
 
         Args:
@@ -36,26 +43,46 @@ class BaseDAO[T: BaseModel]:
             include_deleted: 是否包含已软删除的对象，默认True
 
         Returns:
-            对象实例或None
+            对象实例
+
+        Raises:
+            RecordNotFoundException: 当记录不存在时
+            DatabaseConnectionException: 当数据库连接失败时
         """
         try:
             if include_deleted:
-                return await self.model.get_or_none(id=id)
+                obj = await self.model.get_or_none(id=id)
             else:
-                return await self.model.get_or_none(id=id, is_deleted=False)
+                obj = await self.model.get_or_none(id=id, is_deleted=False)
+
+            if obj is None:
+                raise RecordNotFoundException(f"ID为{id}的记录不存在")
+            return obj
+        except RecordNotFoundException:
+            raise
         except Exception as e:
             logger.error(f"获取对象失败: {e}")
-            return None
+            raise DatabaseConnectionException(f"数据库查询失败: {str(e)}") from e
 
     async def get_by_ids(self, ids: list[UUID]) -> list[T]:
-        """根据ID列表批量获取对象"""
+        """根据ID列表批量获取对象
+
+        Args:
+            ids: 对象ID列表
+
+        Returns:
+            对象列表
+
+        Raises:
+            DatabaseConnectionException: 当数据库连接失败时
+        """
         try:
             return await self.model.filter(id__in=ids).all()
         except Exception as e:
             logger.error(f"批量获取对象失败: {e}")
-            return []
+            raise DatabaseConnectionException(f"批量查询失败: {str(e)}") from e
 
-    async def get_one(self, include_deleted: bool = True, **filters) -> T | None:
+    async def get_one(self, include_deleted: bool = True, **filters) -> T:
         """根据条件获取单个对象
 
         Args:
@@ -63,17 +90,27 @@ class BaseDAO[T: BaseModel]:
             **filters: 过滤条件
 
         Returns:
-            对象实例或None
+            对象实例
+
+        Raises:
+            RecordNotFoundException: 当记录不存在时
+            DatabaseConnectionException: 当数据库连接失败时
         """
         try:
             # 过滤掉None值，避免ORM查询异常
             valid_filters = {k: v for k, v in filters.items() if v is not None}
             if not include_deleted:
                 valid_filters["is_deleted"] = False
-            return await self.model.filter(**valid_filters).first()
+            obj = await self.model.filter(**valid_filters).first()
+
+            if obj is None:
+                raise RecordNotFoundException(f"符合条件{valid_filters}的记录不存在")
+            return obj
+        except RecordNotFoundException:
+            raise
         except Exception as e:
             logger.error(f"获取单个对象失败: {e}")
-            return None
+            raise DatabaseConnectionException(f"条件查询失败: {str(e)}") from e
 
     async def get_all(self, include_deleted: bool = True, **filters) -> list[T]:
         """获取所有对象
@@ -84,6 +121,9 @@ class BaseDAO[T: BaseModel]:
 
         Returns:
             对象列表
+
+        Raises:
+            DatabaseConnectionException: 当数据库连接失败时
         """
         try:
             # 过滤掉None值，避免ORM查询异常
@@ -93,7 +133,7 @@ class BaseDAO[T: BaseModel]:
             return await self.model.filter(**valid_filters).all()
         except Exception as e:
             logger.error(f"获取对象列表失败: {e}")
-            return []
+            raise DatabaseConnectionException(f"列表查询失败: {str(e)}") from e
 
     async def exists(self, include_deleted: bool = True, **filters) -> bool:
         """检查对象是否存在
@@ -104,6 +144,9 @@ class BaseDAO[T: BaseModel]:
 
         Returns:
             是否存在
+
+        Raises:
+            DatabaseConnectionException: 当数据库连接失败时
         """
         try:
             # 过滤掉None值，避免ORM查询异常
@@ -113,7 +156,7 @@ class BaseDAO[T: BaseModel]:
             return await self.model.filter(**valid_filters).exists()
         except Exception as e:
             logger.error(f"检查对象存在性失败: {e}")
-            return False
+            raise DatabaseConnectionException(f"存在性检查失败: {str(e)}") from e
 
     async def count(self, include_deleted: bool = True, **filters) -> int:
         """获取对象数量
@@ -124,6 +167,9 @@ class BaseDAO[T: BaseModel]:
 
         Returns:
             对象数量
+
+        Raises:
+            DatabaseConnectionException: 当数据库连接失败时
         """
         try:
             # 过滤掉None值，避免ORM查询异常
@@ -133,30 +179,72 @@ class BaseDAO[T: BaseModel]:
             return await self.model.filter(**valid_filters).count()
         except Exception as e:
             logger.error(f"获取对象数量失败: {e}")
-            return 0
+            raise DatabaseConnectionException(f"计数查询失败: {str(e)}") from e
 
-    async def create(self, **data) -> T | None:
-        """创建单个对象"""
+    async def create(self, **data) -> T:
+        """创建单个对象
+
+        Args:
+            **data: 对象数据
+
+        Returns:
+            创建的对象实例
+
+        Raises:
+            DuplicateRecordException: 当记录重复时
+            ValidationException: 当数据验证失败时
+            DatabaseConnectionException: 当数据库连接失败时
+        """
         try:
             return await self.model.create(**data)
+        except IntegrityError as e:
+            logger.error(f"创建对象失败，数据完整性错误: {e}")
+            raise DuplicateRecordException(f"记录已存在或违反唯一约束: {str(e)}") from e
         except Exception as e:
             logger.error(f"创建对象失败: {e}")
-            return None
+            raise DatabaseConnectionException(f"创建操作失败: {str(e)}") from e
 
     async def bulk_create(self, objects_data: list[dict[str, Any]]) -> list[T]:
-        """批量创建对象（高性能）"""
+        """批量创建对象（高性能）
+
+        Args:
+            objects_data: 对象数据列表
+
+        Returns:
+            创建的对象列表
+
+        Raises:
+            ValidationException: 当数据验证失败时
+            DatabaseTransactionException: 当批量操作失败时
+        """
         try:
+            if not objects_data:
+                return []
             objects = [self.model(**data) for data in objects_data]
             result = await self.model.bulk_create(objects)
             return result or []
+        except IntegrityError as e:
+            logger.error(f"批量创建对象失败，数据完整性错误: {e}")
+            raise ValidationException(f"批量创建数据验证失败: {str(e)}") from e
         except Exception as e:
             logger.error(f"批量创建对象失败: {e}")
-            return []
+            raise DatabaseTransactionException(f"批量创建操作失败: {str(e)}") from e
 
     async def bulk_create_ignore_conflicts(
         self, objects_data: list[dict[str, Any]], conflict_fields: list[str] | None = None
     ) -> list[T]:
-        """批量创建对象，忽略冲突（INSERT IGNORE模式）"""
+        """批量创建对象，忽略冲突（INSERT IGNORE模式）
+
+        Args:
+            objects_data: 对象数据列表
+            conflict_fields: 冲突字段列表
+
+        Returns:
+            创建的对象列表
+
+        Raises:
+            DatabaseTransactionException: 当批量操作失败时
+        """
         try:
             if not objects_data:
                 return []
@@ -165,28 +253,40 @@ class BaseDAO[T: BaseModel]:
             batch_size = 1000
             all_created = []
 
-            for i in range(0, len(objects_data), batch_size):
-                batch_data = objects_data[i : i + batch_size]
-                objects = [self.model(**data) for data in batch_data]
+            async with in_transaction():
+                for i in range(0, len(objects_data), batch_size):
+                    batch_data = objects_data[i : i + batch_size]
+                    objects = [self.model(**data) for data in batch_data]
 
-                # 使用on_conflict处理冲突
-                result = await self.model.bulk_create(
-                    objects,
-                    on_conflict=conflict_fields or ["id"],
-                    update_fields=[],  # 空列表表示忽略冲突
-                )
-                if result:
-                    all_created.extend(result)
+                    # 使用on_conflict处理冲突
+                    result = await self.model.bulk_create(
+                        objects,
+                        on_conflict=conflict_fields or ["id"],
+                        update_fields=[],  # 空列表表示忽略冲突
+                    )
+                    if result:
+                        all_created.extend(result)
 
-                logger.debug(f"批量创建对象（忽略冲突）: {len(result or [])}/{len(batch_data)} 条")
+                    logger.debug(f"批量创建对象（忽略冲突）: {len(result or [])}/{len(batch_data)} 条")
 
             return all_created
         except Exception as e:
             logger.error(f"批量创建对象（忽略冲突）失败: {e}")
-            return []
+            raise DatabaseTransactionException(f"批量创建（忽略冲突）操作失败: {str(e)}") from e
 
     async def bulk_create_in_batches(self, objects_data: list[dict[str, Any]], batch_size: int = 1000) -> list[T]:
-        """分批次批量创建对象（适用于大数据量）"""
+        """分批次批量创建对象（适用于大数据量）
+
+        Args:
+            objects_data: 对象数据列表
+            batch_size: 批次大小
+
+        Returns:
+            创建的对象列表
+
+        Raises:
+            DatabaseTransactionException: 当批量操作失败时
+        """
         try:
             if not objects_data:
                 return []
@@ -194,9 +294,12 @@ class BaseDAO[T: BaseModel]:
             all_created = []
             total_batches = (len(objects_data) + batch_size - 1) // batch_size
 
-            for i in range(0, len(objects_data), batch_size):
-                batch_data = objects_data[i : i + batch_size]
-                batch_num = i // batch_size + 1
+            async with in_transaction():
+                batch_data = []
+                batch_num: int | None = None
+                for i in range(0, len(objects_data), batch_size):
+                    batch_data = objects_data[i : i + batch_size]
+                    batch_num = i // batch_size + 1
 
                 try:
                     objects = [self.model(**data) for data in batch_data]
@@ -210,38 +313,83 @@ class BaseDAO[T: BaseModel]:
 
                 except Exception as batch_error:
                     logger.error(f"批次 {batch_num} 创建失败: {batch_error}")
-                    continue
 
             logger.info(f"分批次批量创建完成: {len(all_created)}/{len(objects_data)} 条")
             return all_created
 
         except Exception as e:
             logger.error(f"分批次批量创建失败: {e}")
-            return []
+            raise DatabaseTransactionException(f"分批次批量创建操作失败: {str(e)}") from e
 
-    async def update_by_id(self, id: UUID, **data) -> T | None:
-        """根据ID更新对象"""
+    async def update_by_id(self, id: UUID, **data) -> T:
+        """根据ID更新对象
+
+        Args:
+            id: 对象ID
+            **data: 更新数据
+
+        Returns:
+            更新后的对象实例
+
+        Raises:
+            RecordNotFoundException: 当记录不存在时
+            ValidationException: 当数据验证失败时
+            DatabaseConnectionException: 当数据库连接失败时
+        """
         try:
             obj = await self.get_by_id(id)
-            if obj:
-                await obj.update_from_dict(data).save()
-                return obj
-            return None
+            await obj.update_from_dict(data).save()
+            return obj
+        except RecordNotFoundException:
+            raise
+        except IntegrityError as e:
+            logger.error(f"更新对象失败，数据完整性错误: {e}")
+            raise ValidationException(f"更新数据验证失败: {str(e)}") from e
         except Exception as e:
             logger.error(f"更新对象失败: {e}")
-            return None
+            raise DatabaseConnectionException(f"更新操作失败: {str(e)}") from e
 
     async def update_by_filter(self, filters: dict[str, Any], **data) -> int:
-        """根据条件批量更新"""
+        """根据条件批量更新
+
+        Args:
+            filters: 过滤条件
+            **data: 更新数据
+
+        Returns:
+            更新的记录数量
+
+        Raises:
+            ValidationException: 当数据验证失败时
+            DatabaseConnectionException: 当数据库连接失败时
+        """
         try:
             return await self.model.filter(**filters).update(**data)
+        except IntegrityError as e:
+            logger.error(f"条件更新失败，数据完整性错误: {e}")
+            raise ValidationException(f"批量更新数据验证失败: {str(e)}") from e
         except Exception as e:
             logger.error(f"条件更新失败: {e}")
-            return 0
+            raise DatabaseConnectionException(f"条件更新操作失败: {str(e)}") from e
 
     async def bulk_update(self, updates: list[dict[str, Any]], id_field: str = "id") -> int:
-        """批量更新对象（高性能）"""
+        """批量更新对象（高性能）
+
+        Args:
+            updates: 更新数据列表
+            id_field: ID字段名
+
+        Returns:
+            更新的记录数量
+
+        Raises:
+            ValidationException: 当数据验证失败时
+            DatabaseTransactionException: 当批量操作失败时
+        """
         try:
+            if not updates:
+                return 0
+
             update_count = 0
             async with in_transaction():
                 for update_data in updates:
@@ -253,14 +401,30 @@ class BaseDAO[T: BaseModel]:
                     update_count += count
 
             return update_count
+        except IntegrityError as e:
+            logger.error(f"批量更新对象失败，数据完整性错误: {e}")
+            raise ValidationException(f"批量更新数据验证失败: {str(e)}") from e
         except Exception as e:
             logger.error(f"批量更新对象失败: {e}")
-            return 0
+            raise DatabaseTransactionException(f"批量更新操作失败: {str(e)}") from e
 
     async def bulk_update_optimized(
         self, updates: list[dict[str, Any]], id_field: str = "id", batch_size: int = 1000
     ) -> int:
-        """优化的批量更新对象（事务处理 + 分批）"""
+        """优化的批量更新对象（事务处理 + 分批）
+
+        Args:
+            updates: 更新数据列表
+            id_field: ID字段名
+            batch_size: 批次大小
+
+        Returns:
+            更新的记录数量
+
+        Raises:
+            ValidationException: 当数据验证失败时
+            DatabaseTransactionException: 当批量操作失败时
+        """
         try:
             if not updates:
                 return 0
@@ -296,9 +460,12 @@ class BaseDAO[T: BaseModel]:
             logger.info(f"优化批量更新完成: {total_updated}/{len(updates)} 条")
             return total_updated
 
+        except IntegrityError as e:
+            logger.error(f"优化批量更新失败，数据完整性错误: {e}")
+            raise ValidationException(f"优化批量更新数据验证失败: {str(e)}") from e
         except Exception as e:
             logger.error(f"优化批量更新失败: {e}")
-            return 0
+            raise DatabaseTransactionException(f"优化批量更新操作失败: {str(e)}") from e
 
     async def delete_by_id(self, id: UUID, soft: bool = True) -> bool:
         """根据ID删除对象
@@ -364,6 +531,9 @@ class BaseDAO[T: BaseModel]:
 
         Returns:
             (对象列表, 总数)的元组
+
+        Raises:
+            DatabaseConnectionException: 当数据库连接失败时
         """
         try:
             # 计算偏移量
@@ -393,7 +563,7 @@ class BaseDAO[T: BaseModel]:
             return objects, total
         except Exception as e:
             logger.error(f"分页获取对象失败: {e}")
-            return [], 0
+            raise DatabaseConnectionException(f"分页查询失败: {str(e)}") from e
 
     def get_queryset(self, include_deleted: bool = True, **filters) -> QuerySet[T]:
         """获取查询集，用于复杂查询

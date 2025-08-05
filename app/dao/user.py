@@ -11,8 +11,9 @@ from typing import Any
 from uuid import UUID
 
 from tortoise.expressions import Q
-from app.dao.permission import PermissionDAO
+
 from app.dao.base import BaseDAO
+from app.dao.permission import PermissionDAO
 from app.models.user import User
 from app.utils.logger import logger
 
@@ -25,7 +26,14 @@ class UserDAO(BaseDAO[User]):
         self.permission_dao = PermissionDAO()
 
     async def get_by_username(self, username: str) -> User | None:
-        """根据用户名获取用户"""
+        """根据用户名获取用户.
+
+        Args:
+            username: 用户名
+
+        Returns:
+            User | None: 用户对象，未找到返回None
+        """
         try:
             return await self.model.get_or_none(username=username, is_deleted=False)
         except Exception as e:
@@ -33,7 +41,14 @@ class UserDAO(BaseDAO[User]):
             return None
 
     async def get_by_phone(self, phone: str) -> User | None:
-        """根据手机号获取用户"""
+        """根据手机号获取用户.
+
+        Args:
+            phone: 手机号
+
+        Returns:
+            User | None: 用户对象，未找到返回None
+        """
         try:
             return await self.model.get_or_none(phone=phone, is_deleted=False)
         except Exception as e:
@@ -41,7 +56,14 @@ class UserDAO(BaseDAO[User]):
             return None
 
     async def get_by_username_or_phone(self, identifier: str) -> User | None:
-        """根据用户名或手机号获取用户"""
+        """根据用户名或手机号获取用户.
+
+        Args:
+            identifier: 用户名或手机号
+
+        Returns:
+            User | None: 用户对象，未找到返回None
+        """
         try:
             return await self.model.filter(Q(username=identifier) | Q(phone=identifier), is_deleted=False).first()
         except Exception as e:
@@ -49,7 +71,15 @@ class UserDAO(BaseDAO[User]):
             return None
 
     async def check_username_exists(self, username: str, exclude_id: UUID | None = None) -> bool:
-        """检查用户名是否已存在"""
+        """检查用户名是否已存在.
+
+        Args:
+            username: 用户名
+            exclude_id: 排除的用户ID
+
+        Returns:
+            bool: 是否存在
+        """
         try:
             query = Q(username=username, is_deleted=False)
             if exclude_id:
@@ -60,7 +90,15 @@ class UserDAO(BaseDAO[User]):
             return False
 
     async def check_phone_exists(self, phone: str, exclude_id: UUID | None = None) -> bool:
-        """检查手机号是否已存在"""
+        """检查手机号是否已存在.
+
+        Args:
+            phone: 手机号
+            exclude_id: 排除的用户ID
+
+        Returns:
+            bool: 是否存在
+        """
         try:
             query = Q(phone=phone, is_deleted=False)
             if exclude_id:
@@ -71,7 +109,11 @@ class UserDAO(BaseDAO[User]):
             return False
 
     async def get_active_users(self) -> list[User]:
-        """获取所有激活的用户"""
+        """获取所有激活的用户.
+
+        Returns:
+            list[User]: 激活的用户列表
+        """
         try:
             return await self.model.filter(is_active=True, is_deleted=False).all()
         except Exception as e:
@@ -79,7 +121,11 @@ class UserDAO(BaseDAO[User]):
             return []
 
     async def get_superusers(self) -> list[User]:
-        """获取所有超级管理员"""
+        """获取所有超级管理员.
+
+        Returns:
+            list[User]: 超级管理员列表
+        """
         try:
             return await self.model.filter(is_superuser=True, is_deleted=False).all()
         except Exception as e:
@@ -89,7 +135,16 @@ class UserDAO(BaseDAO[User]):
     async def search_users(
         self, keyword: str | None = None, is_active: bool | None = None, role_code: str | None = None
     ) -> list[User]:
-        """搜索用户"""
+        """搜索用户.
+
+        Args:
+            keyword: 搜索关键词（用户名、昵称、手机号）
+            is_active: 是否激活状态筛选
+            role_code: 角色代码筛选
+
+        Returns:
+            list[User]: 匹配的用户列表
+        """
         try:
             query = Q(is_deleted=False)
 
@@ -113,7 +168,15 @@ class UserDAO(BaseDAO[User]):
             return []
 
     async def update_last_login(self, user_id: UUID, login_time: datetime | None = None) -> bool:
-        """更新用户最后登录时间"""
+        """更新用户最后登录时间.
+
+        Args:
+            user_id: 用户ID
+            login_time: 登录时间，为None时使用当前时间
+
+        Returns:
+            bool: 是否更新成功
+        """
         try:
             if login_time is None:
                 login_time = datetime.now()
@@ -125,7 +188,14 @@ class UserDAO(BaseDAO[User]):
             return False
 
     async def activate_user(self, user_id: UUID) -> bool:
-        """激活用户"""
+        """激活用户.
+
+        Args:
+            user_id: 用户ID
+
+        Returns:
+            bool: 是否激活成功
+        """
         try:
             count = await self.model.filter(id=user_id, is_deleted=False).update(is_active=True)
             return count > 0
@@ -134,7 +204,14 @@ class UserDAO(BaseDAO[User]):
             return False
 
     async def deactivate_user(self, user_id: UUID) -> bool:
-        """停用用户"""
+        """停用用户.
+
+        Args:
+            user_id: 用户ID
+
+        Returns:
+            bool: 是否停用成功
+        """
         try:
             count = await self.model.filter(id=user_id, is_deleted=False).update(is_active=False)
             return count > 0
@@ -143,7 +220,15 @@ class UserDAO(BaseDAO[User]):
             return False
 
     async def update_user_settings(self, user_id: UUID, settings: dict[str, Any]) -> bool:
-        """更新用户配置"""
+        """更新用户配置.
+
+        Args:
+            user_id: 用户ID
+            settings: 用户配置字典
+
+        Returns:
+            bool: 是否更新成功
+        """
         try:
             count = await self.model.filter(id=user_id, is_deleted=False).update(user_settings=settings)
             return count > 0
@@ -152,7 +237,14 @@ class UserDAO(BaseDAO[User]):
             return False
 
     async def count_by_role(self, role_code: str) -> int:
-        """统计指定角色的用户数量"""
+        """统计指定角色的用户数量.
+
+        Args:
+            role_code: 角色代码
+
+        Returns:
+            int: 用户数量
+        """
         try:
             return await self.model.filter(roles__role_code=role_code, is_deleted=False).count()
         except Exception as e:
@@ -160,7 +252,14 @@ class UserDAO(BaseDAO[User]):
             return 0
 
     async def get_recently_login_users(self, days: int = 7) -> list[User]:
-        """获取最近登录的用户"""
+        """获取最近登录的用户.
+
+        Args:
+            days: 最近天数，默认7天
+
+        Returns:
+            list[User]: 最近登录的用户列表
+        """
         try:
             from datetime import timedelta
 
@@ -177,7 +276,14 @@ class UserDAO(BaseDAO[User]):
 
     # 关联查询优化示例
     async def get_users_with_logs(self, limit: int = 50) -> list[User]:
-        """获取用户及其相关数据（关联查询优化）"""
+        """获取用户及其相关数据（关联查询优化）.
+
+        Args:
+            limit: 限制数量，默认50
+
+        Returns:
+            list[User]: 用户及其相关数据列表
+        """
         try:
             return await self.get_all_with_related(
                 prefetch_related=["roles", "permissions"],  # 预加载角色和权限
@@ -188,7 +294,14 @@ class UserDAO(BaseDAO[User]):
             return []
 
     async def get_user_with_details(self, user_id: UUID) -> User | None:
-        """获取用户详细信息（包含关联数据）"""
+        """获取用户详细信息（包含关联数据）.
+
+        Args:
+            user_id: 用户ID
+
+        Returns:
+            User | None: 包含关联数据的用户对象，未找到返回None
+        """
         try:
             return await self.get_with_related(
                 id=user_id,
@@ -199,7 +312,14 @@ class UserDAO(BaseDAO[User]):
             return None
 
     async def get_user_ids_by_role_id(self, role_id: UUID) -> list[UUID]:
-        """根据角色ID获取用户ID列表"""
+        """根据角色ID获取用户ID列表.
+
+        Args:
+            role_id: 角色ID
+
+        Returns:
+            list[UUID]: 用户ID列表
+        """
         try:
             # This is a more ORM-friendly way than raw SQL
             users = await self.model.filter(roles__id=role_id).values_list("id", flat=True)
@@ -209,7 +329,14 @@ class UserDAO(BaseDAO[User]):
             return []
 
     async def get_user_ids_by_role(self, role_id: UUID) -> list[UUID]:
-        """根据角色ID获取用户ID列表"""
+        """根据角色ID获取用户ID列表.
+
+        Args:
+            role_id: 角色ID
+
+        Returns:
+            list[UUID]: 用户ID列表
+        """
         # 这是一个用于性能的原始 SQL 查询，因为 ORM 对于多对多筛选可能很复杂。
         conn = self.model._meta.db
         query = 'SELECT user_id FROM "user_roles" WHERE role_id = $1'
@@ -272,7 +399,14 @@ class UserDAO(BaseDAO[User]):
             logger.error(f"从用户 {user_id} 移除角色失败: {e}")
 
     async def get_user_roles(self, user_id: UUID) -> list:
-        """获取用户的角色列表"""
+        """获取用户的角色列表.
+
+        Args:
+            user_id: 用户ID
+
+        Returns:
+            list: 用户角色列表
+        """
         try:
             user = await self.get_with_related(
                 id=user_id,
@@ -292,6 +426,7 @@ class UserDAO(BaseDAO[User]):
         【全量设置】用户的权限（原子操作）。
         """
         from tortoise.transactions import in_transaction
+
         try:
             async with in_transaction():
                 user = await self.get_by_id(user_id)
@@ -304,7 +439,7 @@ class UserDAO(BaseDAO[User]):
                     permissions = await self.permission_dao.get_by_ids(permission_ids)
                     if permissions:
                         await user.permissions.add(*permissions)
-                
+
                 logger.info(f"成功为用户 '{user.username}' 设置了 {len(permission_ids)} 个权限。")
         except Exception as e:
             logger.error(f"为用户 {user_id} 设置权限失败: {e}")
@@ -341,7 +476,14 @@ class UserDAO(BaseDAO[User]):
             logger.error(f"从用户 {user_id} 移除权限失败: {e}")
 
     async def get_user_permissions(self, user_id: UUID) -> list:
-        """获取用户的权限列表"""
+        """获取用户的权限列表.
+
+        Args:
+            user_id: 用户ID
+
+        Returns:
+            list: 用户权限列表
+        """
         try:
             user = await self.get_with_related(
                 id=user_id,

@@ -18,7 +18,7 @@ from app.schemas.auth import (
     TokenResponse,
     UpdateProfileRequest,
 )
-from app.schemas.base import SuccessResponse
+from app.schemas.base import BaseResponse, SuccessResponse
 from app.schemas.user import UserDetailResponse, UserResponse
 from app.services.auth import AuthService
 from app.utils.deps import get_auth_service, get_current_active_user
@@ -71,23 +71,25 @@ async def refresh_token(
     return await auth_service.refresh_token(refresh_data.refresh_token)
 
 
-@router.get("/profile", response_model=UserDetailResponse, summary="获取用户信息")
+@router.get("/profile", response_model=BaseResponse[UserDetailResponse], summary="获取用户信息")
 async def get_profile(
     auth_service: AuthService = Depends(get_auth_service),
     current_user: User = Depends(get_current_active_user),
 ):
     """获取当前用户详细信息"""
-    return await auth_service.get_current_user_profile(current_user)
+    profile = await auth_service.get_current_user_profile(current_user)
+    return BaseResponse(data=profile)
 
 
-@router.put("/profile", response_model=UserResponse, summary="更新用户信息")
+@router.put("/profile", response_model=BaseResponse[UserResponse], summary="更新用户信息")
 async def update_profile(
     profile_data: UpdateProfileRequest,
     auth_service: AuthService = Depends(get_auth_service),
     current_user: User = Depends(get_current_active_user),
 ):
     """更新当前用户信息"""
-    return await auth_service.update_current_user_profile(current_user, profile_data)
+    user = await auth_service.update_current_user_profile(current_user, profile_data)
+    return BaseResponse(data=user, message="用户信息更新成功")
 
 
 @router.put("/password", response_model=SuccessResponse, summary="修改密码")
