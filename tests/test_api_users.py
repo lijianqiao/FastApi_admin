@@ -131,7 +131,9 @@ async def test_remove_user_roles(authenticated_client: AsyncClient):
     await user.roles.add(role1, role2)
 
     remove_data = {"role_ids": [str(role1.id)]}
-    response = await authenticated_client.request("DELETE", f"{settings.API_PREFIX}/v1/users/{user.id}/roles/remove", json=remove_data)
+    response = await authenticated_client.request(
+        "DELETE", f"{settings.API_PREFIX}/v1/users/{user.id}/roles/remove", json=remove_data
+    )
     assert response.status_code == 200
     response_data = response.json()
     data = response_data["data"]
@@ -159,7 +161,9 @@ async def test_assign_user_permissions(authenticated_client: AsyncClient):
     perm = await Permission.create(permission_name="直接权限", permission_code="direct:perm", permission_type="test")
 
     assign_data = {"permission_ids": [str(perm.id)]}
-    response = await authenticated_client.post(f"{settings.API_PREFIX}/v1/users/{user.id}/permissions", json=assign_data)
+    response = await authenticated_client.post(
+        f"{settings.API_PREFIX}/v1/users/{user.id}/permissions", json=assign_data
+    )
     assert response.status_code == 200
 
     # 验证权限是否真的被添加
