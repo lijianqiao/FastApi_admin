@@ -17,7 +17,8 @@ async def test_get_dashboard_stats(authenticated_client: AsyncClient):
     await authenticated_client.get(f"{settings.API_PREFIX}/v1/users") # 产生日志
     response = await authenticated_client.get(f"{settings.API_PREFIX}/v1/admin/dashboard/stats")
     assert response.status_code == 200
-    data = response.json()
+    response_data = response.json()
+    data = response_data["data"]
     assert data["total_users"] >= 1
     assert data["today_operations"] > 0
 
@@ -32,7 +33,9 @@ async def test_check_user_permission(authenticated_client: AsyncClient):
         f"{settings.API_PREFIX}/v1/admin/permissions/check?user_id={user.id}&permission_code=perm:check"
     )
     assert response.status_code == 200
-    assert response.json()["has_permission"] is True
+    response_data = response.json()
+    data = response_data["data"]
+    assert data["has_permission"] is True
 
 
 async def test_batch_enable_disable_users(authenticated_client: AsyncClient):

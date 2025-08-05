@@ -31,7 +31,9 @@ async def test_create_permission(authenticated_client: AsyncClient):
     }
     response = await authenticated_client.post(f"{settings.API_PREFIX}/v1/permissions", json=perm_data)
     assert response.status_code == 201
-    assert response.json()["permissionCode"] == "new:permission"
+    response_data = response.json()
+    data = response_data["data"]
+    assert data["permissionCode"] == "new:permission"
 
 
 async def test_get_permissions(authenticated_client: AsyncClient):
@@ -39,7 +41,9 @@ async def test_get_permissions(authenticated_client: AsyncClient):
     await create_test_permission()
     response = await authenticated_client.get(f"{settings.API_PREFIX}/v1/permissions")
     assert response.status_code == 200
-    assert response.json()["total"] >= 1
+    response_data = response.json()
+    # PaginatedResponse直接包含total字段，不需要通过data访问
+    assert response_data["total"] >= 1
 
 
 async def test_get_permission_detail(authenticated_client: AsyncClient):
@@ -47,7 +51,9 @@ async def test_get_permission_detail(authenticated_client: AsyncClient):
     perm = await create_test_permission()
     response = await authenticated_client.get(f"{settings.API_PREFIX}/v1/permissions/{perm.id}")
     assert response.status_code == 200
-    assert response.json()["id"] == str(perm.id)
+    response_data = response.json()
+    data = response_data["data"]
+    assert data["id"] == str(perm.id)
 
 
 async def test_update_permission(authenticated_client: AsyncClient):
@@ -56,7 +62,9 @@ async def test_update_permission(authenticated_client: AsyncClient):
     update_data = {"description": "更新后的描述", "version": perm.version}
     response = await authenticated_client.put(f"{settings.API_PREFIX}/v1/permissions/{perm.id}", json=update_data)
     assert response.status_code == 200
-    assert response.json()["description"] == "更新后的描述"
+    response_data = response.json()
+    data = response_data["data"]
+    assert data["description"] == "更新后的描述"
 
 
 async def test_delete_permission(authenticated_client: AsyncClient):
@@ -65,4 +73,4 @@ async def test_delete_permission(authenticated_client: AsyncClient):
     response = await authenticated_client.delete(f"{settings.API_PREFIX}/v1/permissions/{perm.id}")
     assert response.status_code == 200
     get_response = await authenticated_client.get(f"{settings.API_PREFIX}/v1/permissions/{perm.id}")
-    assert get_response.status_code == 400
+    assert get_response.status_code == 404

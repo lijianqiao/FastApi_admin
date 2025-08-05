@@ -61,7 +61,7 @@ async def get_dashboard_stats(
         operation_context,
     )
     # 获取今天的操作日志数量
-    today = datetime.now(UTC)
+    today = datetime.now(UTC).date()
     today_logs_request = OperationLogListRequest(page=1, page_size=1, start_date=today, end_date=today)
     today_logs, today_operations = await operation_log_service.get_logs(today_logs_request, operation_context)
 

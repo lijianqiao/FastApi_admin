@@ -23,7 +23,9 @@ async def test_create_role(authenticated_client: AsyncClient):
     role_data = {"role_name": "新角色", "role_code": "new_role"}
     response = await authenticated_client.post(f"{settings.API_PREFIX}/v1/roles", json=role_data)
     assert response.status_code == 201
-    assert response.json()["roleCode"] == "new_role"
+    response_data = response.json()
+    data = response_data["data"]
+    assert data["roleCode"] == "new_role"
 
 
 async def test_get_roles(authenticated_client: AsyncClient):
@@ -39,7 +41,9 @@ async def test_get_role_detail(authenticated_client: AsyncClient):
     role = await create_test_role()
     response = await authenticated_client.get(f"{settings.API_PREFIX}/v1/roles/{role.id}")
     assert response.status_code == 200
-    assert response.json()["id"] == str(role.id)
+    response_data = response.json()
+    data = response_data["data"]
+    assert data["id"] == str(role.id)
 
 
 async def test_update_role(authenticated_client: AsyncClient):
@@ -48,7 +52,9 @@ async def test_update_role(authenticated_client: AsyncClient):
     update_data = {"description": "更新后的描述", "version": role.version}
     response = await authenticated_client.put(f"{settings.API_PREFIX}/v1/roles/{role.id}", json=update_data)
     assert response.status_code == 200
-    assert response.json()["description"] == "更新后的描述"
+    response_data = response.json()
+    data = response_data["data"]
+    assert data["description"] == "更新后的描述"
 
 
 async def test_delete_role(authenticated_client: AsyncClient):
@@ -67,7 +73,8 @@ async def test_update_role_status(authenticated_client: AsyncClient):
     response = await authenticated_client.put(f"{settings.API_PREFIX}/v1/roles/{role.id}/status?is_active=false")
     assert response.status_code == 200
     detail_response = await authenticated_client.get(f"{settings.API_PREFIX}/v1/roles/{role.id}")
-    assert detail_response.json()["isActive"] is False
+    detail_data = detail_response.json()["data"]
+    assert detail_data["isActive"] is False
 
 
 async def test_assign_permissions_to_role_full(authenticated_client: AsyncClient):
@@ -78,7 +85,9 @@ async def test_assign_permissions_to_role_full(authenticated_client: AsyncClient
     assign_data = {"permission_ids": [str(perm1.id), str(perm2.id)]}
     response = await authenticated_client.post(f"{settings.API_PREFIX}/v1/roles/{role.id}/permissions", json=assign_data)
     assert response.status_code == 200
-    assert len(response.json()["permissions"]) == 2
+    response_data = response.json()
+    data = response_data["data"]
+    assert len(data["permissions"]) == 2
 
 
 async def test_add_permissions_to_role_incremental(authenticated_client: AsyncClient):
@@ -90,7 +99,9 @@ async def test_add_permissions_to_role_incremental(authenticated_client: AsyncCl
     add_data = {"permission_ids": [str(perm2.id)]}
     response = await authenticated_client.post(f"{settings.API_PREFIX}/v1/roles/{role.id}/permissions/add", json=add_data)
     assert response.status_code == 200
-    assert len(response.json()["permissions"]) == 2
+    response_data = response.json()
+    data = response_data["data"]
+    assert len(data["permissions"]) == 2
 
 
 async def test_remove_permissions_from_role(authenticated_client: AsyncClient):
@@ -102,7 +113,9 @@ async def test_remove_permissions_from_role(authenticated_client: AsyncClient):
     remove_data = {"permission_ids": [str(perm1.id)]}
     response = await authenticated_client.request("DELETE", f"{settings.API_PREFIX}/v1/roles/{role.id}/permissions/remove", json=remove_data)
     assert response.status_code == 200
-    assert len(response.json()["permissions"]) == 1
+    response_data = response.json()
+    data = response_data["data"]
+    assert len(data["permissions"]) == 1
 
 
 async def test_get_role_permissions(authenticated_client: AsyncClient):
@@ -112,5 +125,7 @@ async def test_get_role_permissions(authenticated_client: AsyncClient):
     await role.permissions.add(perm)
     response = await authenticated_client.get(f"{settings.API_PREFIX}/v1/roles/{role.id}/permissions")
     assert response.status_code == 200
-    assert len(response.json()) == 1
-    assert response.json()[0]["permission_code"] == "p1"
+    response_data = response.json()
+    data = response_data["data"]
+    assert len(data) == 1
+    assert data[0]["permission_code"] == "p1"

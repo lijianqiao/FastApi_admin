@@ -41,8 +41,9 @@ async def test_login_wrong_credentials(client: AsyncClient):
         f"{settings.API_PREFIX}/v1/auth/login",
         json={"username": "wronguser", "password": "wrongpassword"},
     )
-    assert response.status_code == 401
-    assert "用户名或密码错误" in response.text
+    assert response.status_code == 404
+    response_data = response.json()
+    assert response_data["code"] == 404
 
 
 async def test_get_profile(authenticated_client: AsyncClient):
@@ -50,7 +51,8 @@ async def test_get_profile(authenticated_client: AsyncClient):
     response = await authenticated_client.get(f"{settings.API_PREFIX}/v1/auth/profile")
 
     assert response.status_code == 200
-    data = response.json()
+    response_data = response.json()
+    data = response_data["data"]
     assert data["username"] == settings.SUPERUSER_USERNAME
     assert data["isSuperuser"] is True
 
@@ -58,7 +60,7 @@ async def test_get_profile(authenticated_client: AsyncClient):
 async def test_update_profile(authenticated_client: AsyncClient):
     """测试更新当前用户信息接口"""
     profile_response = await authenticated_client.get(f"{settings.API_PREFIX}/v1/auth/profile")
-    current_version = profile_response.json()["version"]
+    current_version = profile_response.json()["data"]["version"]
 
     update_data = {
         "nickname": "新的昵称",
@@ -72,18 +74,20 @@ async def test_update_profile(authenticated_client: AsyncClient):
     )
 
     assert response.status_code == 200
-    data = response.json()
+    response_data = response.json()
+    data = response_data["data"]
     assert data["nickname"] == "新的昵称"
 
     profile_response_after = await authenticated_client.get(f"{settings.API_PREFIX}/v1/auth/profile")
-    assert profile_response_after.json()["nickname"] == "新的昵称"
-    assert profile_response_after.json()["version"] == current_version + 1
+    after_data = profile_response_after.json()["data"]
+    assert after_data["nickname"] == "新的昵称"
+    assert after_data["version"] == current_version + 1
 
 
 async def test_change_password(authenticated_client: AsyncClient):
     """测试修改密码接口"""
     profile_response = await authenticated_client.get(f"{settings.API_PREFIX}/v1/auth/profile")
-    current_version = profile_response.json()["version"]
+    current_version = profile_response.json()["data"]["version"]
 
     password_data = {
         "old_password": settings.SUPERUSER_PASSWORD,

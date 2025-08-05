@@ -34,7 +34,8 @@ async def test_create_user(authenticated_client: AsyncClient):
     }
     response = await authenticated_client.post(f"{settings.API_PREFIX}/v1/users", json=user_data)
     assert response.status_code == 201
-    data = response.json()
+    response_data = response.json()
+    data = response_data["data"]
     assert data["username"] == "newuser"
 
 
@@ -52,7 +53,8 @@ async def test_get_user_detail(authenticated_client: AsyncClient):
     user = await create_test_user()
     response = await authenticated_client.get(f"{settings.API_PREFIX}/v1/users/{user.id}")
     assert response.status_code == 200
-    data = response.json()
+    response_data = response.json()
+    data = response_data["data"]
     assert data["id"] == str(user.id)
 
 
@@ -65,7 +67,8 @@ async def test_update_user(authenticated_client: AsyncClient):
         json=update_data,
     )
     assert response.status_code == 200
-    data = response.json()
+    response_data = response.json()
+    data = response_data["data"]
     assert data["nickname"] == "更新后的昵称"
     assert data["isActive"] is False
 
@@ -87,7 +90,8 @@ async def test_update_user_status(authenticated_client: AsyncClient):
     assert response.status_code == 200
 
     detail_response = await authenticated_client.get(f"{settings.API_PREFIX}/v1/users/{user.id}")
-    assert detail_response.json()["isActive"] is False
+    detail_data = detail_response.json()["data"]
+    assert detail_data["isActive"] is False
 
 
 async def test_assign_user_roles_full(authenticated_client: AsyncClient):
@@ -99,7 +103,8 @@ async def test_assign_user_roles_full(authenticated_client: AsyncClient):
     assign_data = {"role_ids": [str(role1.id), str(role2.id)]}
     response = await authenticated_client.post(f"{settings.API_PREFIX}/v1/users/{user.id}/roles", json=assign_data)
     assert response.status_code == 200
-    data = response.json()
+    response_data = response.json()
+    data = response_data["data"]
     assert len(data["roles"]) == 2
 
 
@@ -113,7 +118,8 @@ async def test_add_user_roles_incremental(authenticated_client: AsyncClient):
     add_data = {"role_ids": [str(role2.id)]}
     response = await authenticated_client.post(f"{settings.API_PREFIX}/v1/users/{user.id}/roles/add", json=add_data)
     assert response.status_code == 200
-    data = response.json()
+    response_data = response.json()
+    data = response_data["data"]
     assert len(data["roles"]) == 2
 
 
@@ -127,7 +133,8 @@ async def test_remove_user_roles(authenticated_client: AsyncClient):
     remove_data = {"role_ids": [str(role1.id)]}
     response = await authenticated_client.request("DELETE", f"{settings.API_PREFIX}/v1/users/{user.id}/roles/remove", json=remove_data)
     assert response.status_code == 200
-    data = response.json()
+    response_data = response.json()
+    data = response_data["data"]
     assert len(data["roles"]) == 1
     assert data["roles"][0]["roleCode"] == "role2"
 
@@ -140,7 +147,8 @@ async def test_get_user_roles(authenticated_client: AsyncClient):
 
     response = await authenticated_client.get(f"{settings.API_PREFIX}/v1/users/{user.id}/roles")
     assert response.status_code == 200
-    data = response.json()
+    response_data = response.json()
+    data = response_data["data"]
     assert len(data) == 1
     assert data[0]["role_code"] == "role1"
 

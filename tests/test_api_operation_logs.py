@@ -19,8 +19,9 @@ async def test_get_operation_logs(authenticated_client: AsyncClient):
 
     response = await authenticated_client.get(f"{settings.API_PREFIX}/v1/operation-logs")
     assert response.status_code == 200
-    data = response.json()
-    assert data["total"] >= 1
+    response_data = response.json()
+    # PaginatedResponse直接包含total字段，不需要通过data访问
+    assert response_data["total"] >= 1
 
 
 async def test_get_operation_log_statistics(authenticated_client: AsyncClient):
@@ -36,8 +37,11 @@ async def test_get_operation_log_statistics(authenticated_client: AsyncClient):
         f"{settings.API_PREFIX}/v1/operation-logs/statistics?start_date={start_date}&end_date={end_date}"
     )
     assert response.status_code == 200
-    data = response.json()["data"]
-    assert data["total_operations"] > 0
+    response_data = response.json()
+    data = response_data["data"]
+    # 统计数据在data.data中，因为OperationLogStatisticsResponse包含data字段
+    stats = data["data"]
+    assert stats["total_operations"] > 0
 
 
 async def test_cleanup_logs(authenticated_client: AsyncClient):

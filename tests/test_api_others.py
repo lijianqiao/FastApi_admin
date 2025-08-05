@@ -20,8 +20,9 @@ async def test_get_operation_logs(authenticated_client: AsyncClient):
     response = await authenticated_client.get(f"{settings.API_PREFIX}/v1/operation-logs")
 
     assert response.status_code == 200
-    data = response.json()
-    assert data["total"] >= 1
+    response_data = response.json()
+    # PaginatedResponse直接包含total字段
+    assert response_data["total"] >= 1
 
 
 async def test_get_dashboard_stats(authenticated_client: AsyncClient):
@@ -32,7 +33,8 @@ async def test_get_dashboard_stats(authenticated_client: AsyncClient):
     response = await authenticated_client.get(f"{settings.API_PREFIX}/v1/admin/dashboard/stats")
 
     assert response.status_code == 200
-    data = response.json()
+    response_data = response.json()
+    data = response_data["data"]
     assert "total_users" in data
     assert data["total_users"] >= 1  # 至少有超级用户
     assert data["today_operations"] > 0
