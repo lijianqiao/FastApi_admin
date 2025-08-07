@@ -253,6 +253,12 @@ def operation_log_with_context(operation_type: str, operation_name: str, resourc
 
             # 优先从依赖注入中获取OperationContext
             operation_context = kwargs.get("operation_context")
+            if not operation_context:
+                # 从位置参数中查找包含 user 和 request 属性的 OperationContext
+                for arg in args:
+                    if hasattr(arg, "user") and hasattr(arg, "request"):
+                        operation_context = arg
+                        break
             if operation_context:
                 # 从依赖注入的上下文中提取信息
                 context.user_id = str(operation_context.user.id)
