@@ -166,9 +166,13 @@ class RoleDAO(BaseDAO[Role]):
     async def get_roles_with_relations(self) -> list[Role]:
         """获取角色及其关联的用户和权限信息"""
         try:
-            return await self.get_all_with_related(
+            roles, _ = await self.get_paginated_with_related(
+                page=1,
+                page_size=10000,  # 设置足够大的页面大小获取所有记录
                 prefetch_related=["users", "permissions"],
+                include_deleted=False,
             )
+            return roles
         except Exception as e:
             logger.error(f"获取角色及关联信息失败: {e}")
             return []

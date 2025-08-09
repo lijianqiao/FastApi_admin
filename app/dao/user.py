@@ -182,10 +182,7 @@ class UserDAO(BaseDAO[User]):
                 login_time = datetime.now()
 
             # 更新最后登录时间的同时更新 updated_at 字段
-            count = await self.model.filter(id=user_id).update(
-                last_login_at=login_time,
-                updated_at=datetime.now()
-            )
+            count = await self.model.filter(id=user_id).update(last_login_at=login_time, updated_at=datetime.now())
             return count > 0
         except Exception as e:
             logger.error(f"更新用户最后登录时间失败: {e}")
@@ -203,8 +200,7 @@ class UserDAO(BaseDAO[User]):
         try:
             # 激活用户的同时更新 updated_at 字段
             count = await self.model.filter(id=user_id, is_deleted=False).update(
-                is_active=True,
-                updated_at=datetime.now()
+                is_active=True, updated_at=datetime.now()
             )
             return count > 0
         except Exception as e:
@@ -223,8 +219,7 @@ class UserDAO(BaseDAO[User]):
         try:
             # 停用用户的同时更新 updated_at 字段
             count = await self.model.filter(id=user_id, is_deleted=False).update(
-                is_active=False,
-                updated_at=datetime.now()
+                is_active=False, updated_at=datetime.now()
             )
             return count > 0
         except Exception as e:
@@ -244,8 +239,7 @@ class UserDAO(BaseDAO[User]):
         try:
             # 更新用户配置的同时更新 updated_at 字段
             count = await self.model.filter(id=user_id, is_deleted=False).update(
-                user_settings=settings,
-                updated_at=datetime.now()
+                user_settings=settings, updated_at=datetime.now()
             )
             return count > 0
         except Exception as e:
@@ -301,10 +295,13 @@ class UserDAO(BaseDAO[User]):
             list[User]: 用户及其相关数据列表
         """
         try:
-            return await self.get_all_with_related(
+            users, _ = await self.get_paginated_with_related(
+                page=1,
+                page_size=10000,  # 设置足够大的页面大小获取所有记录
                 prefetch_related=["roles", "permissions"],  # 预加载角色和权限
                 is_deleted=False,
             )
+            return users
         except Exception as e:
             logger.error(f"获取用户及相关数据失败: {e}")
             return []

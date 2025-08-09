@@ -84,11 +84,14 @@ class PermissionDAO(BaseDAO[Permission]):
     async def get_permissions_with_relations(self) -> list[Permission]:
         """获取所有权限及其关联的角色和用户"""
         try:
-            return await self.get_all_with_related(
+            permissions, _ = await self.get_paginated_with_related(
+                page=1,
+                page_size=10000,  # 设置足够大的页面大小获取所有记录
                 prefetch_related=["roles", "users"],
                 is_active=True,
                 is_deleted=False,
             )
+            return permissions
         except Exception as e:
             logger.error(f"获取权限及关联信息失败: {e}")
             return []

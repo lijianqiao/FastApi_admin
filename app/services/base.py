@@ -176,15 +176,15 @@ class BaseService[T: BaseModel]:
         return await self.dao.update_by_filter(processed_filters, **processed_data)
 
     async def delete(self, id: UUID, operation_context: OperationContext) -> bool:
-        """删除对象（默认软删除）"""
+        """删除对象（软删除）"""
         return await self.dao.delete_by_id(id)
 
     async def delete_by_ids(self, ids: list[UUID], operation_context: OperationContext) -> int:
-        """批量删除对象（默认软删除）"""
+        """批量删除对象（软删除）"""
         return await self.dao.delete_by_ids(ids)
 
     async def delete_by_filter(self, **filters) -> int:
-        """根据条件批量删除（默认软删除）"""
+        """根据条件批量删除（软删除）"""
         return await self.dao.delete_by_filter(**filters)
 
     async def get_paginated(
@@ -202,19 +202,6 @@ class BaseService[T: BaseModel]:
     ) -> list[T]:
         """批量插入或更新"""
         return await self.dao.bulk_upsert(objects_data, conflict_fields, update_fields)
-
-    # 软删除方法
-    async def soft_delete(self, id: UUID) -> bool:
-        """软删除对象（标记为已删除）"""
-        return await self.dao.soft_delete_by_id(id)
-
-    async def soft_delete_by_ids(self, ids: list[UUID]) -> int:
-        """批量软删除对象"""
-        return await self.dao.soft_delete_by_ids(ids)
-
-    async def soft_delete_by_filter(self, **filters) -> int:
-        """根据条件批量软删除"""
-        return await self.dao.soft_delete_by_filter(**filters)
 
     # 硬删除方法（物理删除）
     async def hard_delete(self, id: UUID) -> bool:
@@ -238,32 +225,14 @@ class BaseService[T: BaseModel]:
         """批量恢复软删除的对象"""
         return await self.dao.restore_by_ids(ids)
 
-    # 查询增强方法
-    async def get_active_by_id(self, id: UUID) -> T | None:
-        """根据ID获取未删除的对象"""
-        return await self.dao.get_active_by_id(id)
-
+    # 查询增强方法（保留常用的便利方法）
     async def get_active_all(self, **filters) -> list[T]:
         """获取所有未删除的对象"""
         return await self.dao.get_active_all(**filters)
 
-    async def get_deleted_all(self, **filters) -> list[T]:
-        """获取所有已软删除的对象"""
-        return await self.dao.get_deleted_all(**filters)
-
     async def count_active(self, **filters) -> int:
         """统计未删除对象的数量"""
         return await self.dao.count_active(**filters)
-
-    async def count_deleted(self, **filters) -> int:
-        """统计已软删除对象的数量"""
-        return await self.dao.count_deleted(**filters)
-
-    async def get_active_paginated(
-        self, page: int = 1, page_size: int = 10, order_by: list[str] | None = None, **filters
-    ) -> tuple[list[T], int]:
-        """分页获取未删除的对象"""
-        return await self.dao.get_active_paginated(page, page_size, order_by, **filters)
 
     # ------------------- 关联查询优化方法 -------------------
     async def get_with_related(
@@ -276,7 +245,14 @@ class BaseService[T: BaseModel]:
         self, select_related: list[str] | None = None, prefetch_related: list[str] | None = None, **filters
     ) -> list[T]:
         """获取所有对象（关联查询优化）"""
-        return await self.dao.get_all_with_related(select_related, prefetch_related, **filters)
+        objects, _ = await self.dao.get_paginated_with_related(
+            page=1,
+            page_size=10000,  # 设置足够大的页面大小获取所有记录
+            select_related=select_related,
+            prefetch_related=prefetch_related,
+            **filters,
+        )
+        return objects
 
     async def get_paginated_with_related(
         self,
@@ -352,10 +328,28 @@ class BaseService[T: BaseModel]:
         processed_updates = await self.before_bulk_update(updates)
         return await self.dao.bulk_update_optimized(processed_updates, id_field, batch_size)
 
-    async def bulk_soft_delete_optimized(self, ids: list[UUID], batch_size: int = 1000) -> int:
-        """批量软删除"""
-        return await self.dao.bulk_soft_delete_optimized(ids, batch_size)
+    async def bulk_delete_optimized(self, ids: list[UUID], batch_size: int = 1000) -> int:
+        """批量删除（使用分批处理）"""
+        # 使用现有的批量删除方法，分批处理大数据量
+        if len(ids) <= batch_size:
+            return await self.dao.delete_by_ids(ids)
+
+        total_deleted = 0
+        for i in range(0, len(ids), batch_size):
+            batch_ids = ids[i : i + batch_size]
+            deleted_count = await self.dao.delete_by_ids(batch_ids)
+            total_deleted += deleted_count
+        return total_deleted
 
     async def bulk_restore_optimized(self, ids: list[UUID], batch_size: int = 1000) -> int:
-        """批量恢复"""
-        return await self.dao.bulk_restore_optimized(ids, batch_size)
+        """批量恢复（使用分批处理）"""
+        # 使用现有的批量恢复方法，分批处理大数据量
+        if len(ids) <= batch_size:
+            return await self.dao.restore_by_ids(ids)
+
+        total_restored = 0
+        for i in range(0, len(ids), batch_size):
+            batch_ids = ids[i : i + batch_size]
+            restored_count = await self.dao.restore_by_ids(batch_ids)
+            total_restored += restored_count
+        return total_restored

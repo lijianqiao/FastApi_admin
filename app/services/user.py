@@ -126,7 +126,10 @@ class UserService(BaseService[User]):
 
     @log_update_with_context("user")
     async def update_user(
-        self, user_id: UUID, request: UserUpdateRequest, operation_context: OperationContext,
+        self,
+        user_id: UUID,
+        request: UserUpdateRequest,
+        operation_context: OperationContext,
     ) -> UserResponse:
         """更新用户信息.
 
@@ -184,7 +187,9 @@ class UserService(BaseService[User]):
         """
         # 确保不返回软删除的用户
         user = await self.dao.get_with_related(
-            user_id, prefetch_related=["roles", "permissions"], include_deleted=False,
+            user_id,
+            prefetch_related=["roles", "permissions"],
+            include_deleted=False,
         )
         if not user:
             msg = "用户未找到"
@@ -197,7 +202,9 @@ class UserService(BaseService[User]):
 
     @log_query_with_context("user")
     async def get_users(
-        self, query: UserListRequest, _operation_context: OperationContext,
+        self,
+        query: UserListRequest,
+        _operation_context: OperationContext,
     ) -> tuple[list[UserResponse], int]:
         """获取用户列表.
 
@@ -290,7 +297,10 @@ class UserService(BaseService[User]):
 
     @invalidate_user_permission_cache("user_id")
     async def assign_roles(
-        self, user_id: UUID, role_ids: list[UUID], operation_context: OperationContext,
+        self,
+        user_id: UUID,
+        role_ids: list[UUID],
+        operation_context: OperationContext,
     ) -> UserDetailResponse:
         """为用户分配角色 (全量设置).
 
@@ -318,7 +328,10 @@ class UserService(BaseService[User]):
 
     @invalidate_user_permission_cache("user_id")
     async def add_user_roles(
-        self, user_id: UUID, role_ids: list[UUID], operation_context: OperationContext,
+        self,
+        user_id: UUID,
+        role_ids: list[UUID],
+        operation_context: OperationContext,
     ) -> UserDetailResponse:
         """为用户增量添加角色.
 
@@ -344,7 +357,10 @@ class UserService(BaseService[User]):
 
     @invalidate_user_permission_cache("user_id")
     async def remove_user_roles(
-        self, user_id: UUID, role_ids: list[UUID], operation_context: OperationContext,
+        self,
+        user_id: UUID,
+        role_ids: list[UUID],
+        operation_context: OperationContext,
     ) -> UserDetailResponse:
         """移除用户的指定角色.
 
@@ -392,7 +408,10 @@ class UserService(BaseService[User]):
 
     @invalidate_user_permission_cache("user_id")
     async def assign_permissions_to_user(
-        self, user_id: UUID, request: UserAssignPermissionsRequest, operation_context: OperationContext,
+        self,
+        user_id: UUID,
+        request: UserAssignPermissionsRequest,
+        operation_context: OperationContext,
     ) -> UserDetailResponse:
         """为用户分配直接权限 (全量设置).
 
@@ -409,7 +428,10 @@ class UserService(BaseService[User]):
         return await self.get_user_detail(user_id, operation_context)
 
     async def add_user_permissions(
-        self, user_id: UUID, permission_ids: list[UUID], operation_context: OperationContext,
+        self,
+        user_id: UUID,
+        permission_ids: list[UUID],
+        operation_context: OperationContext,
     ) -> UserDetailResponse:
         """为用户增量添加权限.
 
@@ -434,7 +456,10 @@ class UserService(BaseService[User]):
         return await self.get_user_detail(user_id, operation_context)
 
     async def remove_user_permissions(
-        self, user_id: UUID, permission_ids: list[UUID], operation_context: OperationContext,
+        self,
+        user_id: UUID,
+        permission_ids: list[UUID],
+        operation_context: OperationContext,
     ) -> UserDetailResponse:
         """移除用户的指定权限.
 
@@ -459,7 +484,9 @@ class UserService(BaseService[User]):
         return await self.get_user_detail(user_id, operation_context)
 
     async def get_user_permissions(
-        self, user_id: UUID, _operation_context: OperationContext,
+        self,
+        user_id: UUID,
+        _operation_context: OperationContext,
     ) -> list[PermissionResponse]:
         """获取用户的直接权限列表.
 
@@ -493,7 +520,7 @@ class UserService(BaseService[User]):
             list[UserResponse]: 用户列表
 
         """
-        users = await self.dao.find_by_fields(roles__id=role_id, include_deleted=False)
+        users = await self.dao.get_all(roles__id=role_id, include_deleted=False)
         return [UserResponse.model_validate(user) for user in users]
 
     async def _get_user_permissions(self, user: User) -> set[Permission]:

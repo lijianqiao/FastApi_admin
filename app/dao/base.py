@@ -342,7 +342,7 @@ class BaseDAO[T: BaseModel]:
             # 使用 update_from_dict 更新字段，然后使用 save(update_fields) 确保 updated_at 自动更新
             obj.update_from_dict(data)
             # 获取需要更新的字段名称，加上 updated_at 字段
-            update_fields = list(data.keys()) + ['updated_at']
+            update_fields = list(data.keys()) + ["updated_at"]
             await obj.save(update_fields=update_fields)
             return obj
         except RecordNotFoundException:
@@ -370,7 +370,7 @@ class BaseDAO[T: BaseModel]:
         """
         try:
             # 为批量更新添加 updated_at 字段的自动更新
-            data['updated_at'] = datetime.now()
+            data["updated_at"] = datetime.now()
             return await self.model.filter(**filters).update(**data)
         except IntegrityError as e:
             logger.error(f"条件更新失败，数据完整性错误: {e}")
@@ -405,7 +405,7 @@ class BaseDAO[T: BaseModel]:
 
                     obj_id = update_data.pop(id_field)
                     # 为每个更新添加 updated_at 字段
-                    update_data['updated_at'] = datetime.now()
+                    update_data["updated_at"] = datetime.now()
                     count = await self.model.filter(id=obj_id).update(**update_data)
                     update_count += count
 
@@ -455,7 +455,7 @@ class BaseDAO[T: BaseModel]:
 
                             obj_id = update_data.pop(id_field)
                             # 为每个更新添加 updated_at 字段
-                            update_data['updated_at'] = datetime.now()
+                            update_data["updated_at"] = datetime.now()
                             count = await self.model.filter(id=obj_id).update(**update_data)
                             batch_updated += count
 
@@ -700,42 +700,14 @@ class BaseDAO[T: BaseModel]:
             logger.error(f"批量恢复对象失败: {e}")
             return 0
 
-    # 便利方法 - 针对特定状态的查询
-    async def get_active_by_id(self, id: UUID) -> T | None:
-        """根据ID获取未删除的对象（便利方法）"""
-        return await self.get_by_id(id, include_deleted=False)
-
+    # 便利方法 - 针对特定状态的查询（保留常用的便利方法）
     async def get_active_all(self, **filters) -> list[T]:
         """获取所有未删除的对象（便利方法）"""
         return await self.get_all(include_deleted=False, **filters)
 
-    async def get_deleted_all(self, **filters) -> list[T]:
-        """获取所有已软删除的对象"""
-        try:
-            filters["is_deleted"] = True
-            return await self.model.filter(**filters).all()
-        except Exception as e:
-            logger.error(f"获取已删除对象列表失败: {e}")
-            return []
-
     async def count_active(self, **filters) -> int:
         """统计未删除对象的数量（便利方法）"""
         return await self.count(include_deleted=False, **filters)
-
-    async def count_deleted(self, **filters) -> int:
-        """统计已软删除对象的数量"""
-        try:
-            filters["is_deleted"] = True
-            return await self.model.filter(**filters).count()
-        except Exception as e:
-            logger.error(f"统计已删除对象数量失败: {e}")
-            return 0
-
-    async def get_active_paginated(
-        self, page: int = 1, page_size: int = 10, order_by: list[str] | None = None, **filters
-    ) -> tuple[list[T], int]:
-        """分页获取未删除的对象（便利方法）"""
-        return await self.get_paginated(page, page_size, order_by, include_deleted=False, **filters)
 
     async def update_with_optimistic_lock(self, obj_to_update: T, data_to_update: dict) -> T:
         """
@@ -790,25 +762,7 @@ class BaseDAO[T: BaseModel]:
         """
         return await self.model.get_or_none(**kwargs)
 
-    # 新增通用查询方法
-    async def find_by_fields(self, include_deleted: bool = True, **fields) -> list[T]:
-        """根据多个字段查询对象
-
-        Args:
-            include_deleted: 是否包含已软删除的对象，默认True
-            **fields: 字段条件
-
-        Returns:
-            对象列表
-        """
-        try:
-            if not include_deleted:
-                fields["is_deleted"] = False
-            return await self.model.filter(**fields).all()
-        except Exception as e:
-            logger.error(f"按字段查询失败: {e}")
-            return []
-
+    # 通用查询方法（保留核心功能）
     async def find_like(self, field: str, value: str, include_deleted: bool = True) -> list[T]:
         """模糊查询
 
@@ -830,31 +784,7 @@ class BaseDAO[T: BaseModel]:
             logger.error(f"模糊查询失败: {e}")
             return []
 
-    async def find_in_range(
-        self, field: str, start_value: Any, end_value: Any, include_deleted: bool = True
-    ) -> list[T]:
-        """范围查询
-
-        Args:
-            field: 字段名
-            start_value: 开始值
-            end_value: 结束值
-            include_deleted: 是否包含已软删除的对象，默认True
-
-        Returns:
-            对象列表
-        """
-        try:
-            if include_deleted:
-                filter_dict = {f"{field}__gte": start_value, f"{field}__lte": end_value}
-            else:
-                filter_dict = {f"{field}__gte": start_value, f"{field}__lte": end_value, "is_deleted": False}
-            return await self.model.filter(**filter_dict).all()
-        except Exception as e:
-            logger.error(f"范围查询失败: {e}")
-            return []
-
-    # 关联查询优化方法
+    # 关联查询优化方法（保留核心功能）
     async def get_with_related(
         self,
         id: UUID,
@@ -888,40 +818,6 @@ class BaseDAO[T: BaseModel]:
         except Exception as e:
             logger.error(f"获取关联对象失败: {e}")
             return None
-
-    async def get_all_with_related(
-        self,
-        select_related: list[str] | None = None,
-        prefetch_related: list[str] | None = None,
-        include_deleted: bool = True,
-        **filters,
-    ) -> list[T]:
-        """获取所有对象，预加载关联数据
-
-        Args:
-            select_related: 一对一或多对一关联字段列表
-            prefetch_related: 一对多或多对多关联字段列表
-            include_deleted: 是否包含已软删除的对象
-            **filters: 其他过滤条件
-
-        Returns:
-            对象列表
-        """
-        try:
-            if not include_deleted:
-                filters["is_deleted"] = False
-
-            queryset = self.model.filter(**filters)
-
-            if select_related:
-                queryset = queryset.select_related(*select_related)
-            if prefetch_related:
-                queryset = queryset.prefetch_related(*prefetch_related)
-
-            return await queryset.all()
-        except Exception as e:
-            logger.error(f"获取关联对象列表失败: {e}")
-            return []
 
     async def get_paginated_with_related(
         self,
@@ -1015,93 +911,3 @@ class BaseDAO[T: BaseModel]:
             queryset = queryset.prefetch_related(*prefetch_related)
 
         return queryset
-
-    async def bulk_soft_delete_optimized(self, ids: list[UUID], batch_size: int = 1000) -> int:
-        """优化的批量软删除（事务处理 + 分批）
-
-        Args:
-            ids: 要删除的对象ID列表
-            batch_size: 每批处理的数量，默认1000
-
-        Returns:
-            删除的对象数量
-        """
-        try:
-            if not ids:
-                return 0
-
-            total_deleted = 0
-            total_batches = (len(ids) + batch_size - 1) // batch_size
-
-            for i in range(0, len(ids), batch_size):
-                batch_ids = ids[i : i + batch_size]
-                batch_num = i // batch_size + 1
-                batch_deleted = 0
-
-                try:
-                    # 使用事务处理每个批次
-                    async with in_transaction():
-                        batch_deleted = await self.model.filter(id__in=batch_ids, is_deleted=False).update(
-                            is_deleted=True
-                        )
-
-                    total_deleted += batch_deleted
-                    logger.debug(
-                        f"批量软删除进度: {batch_num}/{total_batches}, 本批次: {batch_deleted}/{len(batch_ids)}"
-                    )
-
-                except Exception as batch_error:
-                    logger.error(f"批次 {batch_num} 软删除失败: {batch_error}")
-                    continue
-
-            logger.info(f"优化批量软删除完成: {total_deleted}/{len(ids)} 条")
-            return total_deleted
-
-        except Exception as e:
-            logger.error(f"优化批量软删除失败: {e}")
-            return 0
-
-    async def bulk_restore_optimized(self, ids: list[UUID], batch_size: int = 1000) -> int:
-        """优化的批量恢复（事务处理 + 分批）
-
-        Args:
-            ids: 要恢复的对象ID列表
-            batch_size: 每批处理的数量，默认1000
-
-        Returns:
-            恢复的对象数量
-        """
-        try:
-            if not ids:
-                return 0
-
-            total_restored = 0
-            total_batches = (len(ids) + batch_size - 1) // batch_size
-
-            for i in range(0, len(ids), batch_size):
-                batch_ids = ids[i : i + batch_size]
-                batch_num = i // batch_size + 1
-                batch_restored = 0
-
-                try:
-                    # 使用事务处理每个批次
-                    async with in_transaction():
-                        batch_restored = await self.model.filter(id__in=batch_ids, is_deleted=True).update(
-                            is_deleted=False
-                        )
-
-                    total_restored += batch_restored
-                    logger.debug(
-                        f"批量恢复进度: {batch_num}/{total_batches}, 本批次: {batch_restored}/{len(batch_ids)}"
-                    )
-
-                except Exception as batch_error:
-                    logger.error(f"批次 {batch_num} 恢复失败: {batch_error}")
-                    continue
-
-            logger.info(f"优化批量恢复完成: {total_restored}/{len(ids)} 条")
-            return total_restored
-
-        except Exception as e:
-            logger.error(f"优化批量恢复失败: {e}")
-            return 0
