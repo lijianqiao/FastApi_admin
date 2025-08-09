@@ -7,6 +7,7 @@
 """
 
 import asyncio
+from datetime import datetime
 from typing import Any, TypeVar
 from uuid import UUID
 
@@ -338,7 +339,11 @@ class BaseDAO[T: BaseModel]:
         """
         try:
             obj = await self.get_by_id(id)
-            await obj.update_from_dict(data).save()
+            # 使用 update_from_dict 更新字段，然后使用 save(update_fields) 确保 updated_at 自动更新
+            obj.update_from_dict(data)
+            # 获取需要更新的字段名称，加上 updated_at 字段
+            update_fields = list(data.keys()) + ['updated_at']
+            await obj.save(update_fields=update_fields)
             return obj
         except RecordNotFoundException:
             raise
@@ -364,6 +369,8 @@ class BaseDAO[T: BaseModel]:
             DatabaseConnectionException: 当数据库连接失败时
         """
         try:
+            # 为批量更新添加 updated_at 字段的自动更新
+            data['updated_at'] = datetime.now()
             return await self.model.filter(**filters).update(**data)
         except IntegrityError as e:
             logger.error(f"条件更新失败，数据完整性错误: {e}")
@@ -397,6 +404,8 @@ class BaseDAO[T: BaseModel]:
                         continue
 
                     obj_id = update_data.pop(id_field)
+                    # 为每个更新添加 updated_at 字段
+                    update_data['updated_at'] = datetime.now()
                     count = await self.model.filter(id=obj_id).update(**update_data)
                     update_count += count
 
@@ -445,6 +454,8 @@ class BaseDAO[T: BaseModel]:
                                 continue
 
                             obj_id = update_data.pop(id_field)
+                            # 为每个更新添加 updated_at 字段
+                            update_data['updated_at'] = datetime.now()
                             count = await self.model.filter(id=obj_id).update(**update_data)
                             batch_updated += count
 
@@ -742,7 +753,8 @@ class BaseDAO[T: BaseModel]:
             更新后的模型实例。
         """
         current_version = obj_to_update.version
-        update_data = {**data_to_update, "version": current_version + 1}
+        # 添加 updated_at 字段的自动更新和版本号递增
+        update_data = {**data_to_update, "version": current_version + 1, "updated_at": datetime.now()}
 
         # 执行原子性的 UPDATE ... WHERE version = ? 操作
         rows_affected = await self.model.filter(id=obj_to_update.id, version=current_version).update(**update_data)

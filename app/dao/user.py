@@ -181,7 +181,11 @@ class UserDAO(BaseDAO[User]):
             if login_time is None:
                 login_time = datetime.now()
 
-            count = await self.model.filter(id=user_id).update(last_login_at=login_time)
+            # 更新最后登录时间的同时更新 updated_at 字段
+            count = await self.model.filter(id=user_id).update(
+                last_login_at=login_time,
+                updated_at=datetime.now()
+            )
             return count > 0
         except Exception as e:
             logger.error(f"更新用户最后登录时间失败: {e}")
@@ -197,7 +201,11 @@ class UserDAO(BaseDAO[User]):
             bool: 是否激活成功
         """
         try:
-            count = await self.model.filter(id=user_id, is_deleted=False).update(is_active=True)
+            # 激活用户的同时更新 updated_at 字段
+            count = await self.model.filter(id=user_id, is_deleted=False).update(
+                is_active=True,
+                updated_at=datetime.now()
+            )
             return count > 0
         except Exception as e:
             logger.error(f"激活用户失败: {e}")
@@ -213,7 +221,11 @@ class UserDAO(BaseDAO[User]):
             bool: 是否停用成功
         """
         try:
-            count = await self.model.filter(id=user_id, is_deleted=False).update(is_active=False)
+            # 停用用户的同时更新 updated_at 字段
+            count = await self.model.filter(id=user_id, is_deleted=False).update(
+                is_active=False,
+                updated_at=datetime.now()
+            )
             return count > 0
         except Exception as e:
             logger.error(f"停用用户失败: {e}")
@@ -230,7 +242,11 @@ class UserDAO(BaseDAO[User]):
             bool: 是否更新成功
         """
         try:
-            count = await self.model.filter(id=user_id, is_deleted=False).update(user_settings=settings)
+            # 更新用户配置的同时更新 updated_at 字段
+            count = await self.model.filter(id=user_id, is_deleted=False).update(
+                user_settings=settings,
+                updated_at=datetime.now()
+            )
             return count > 0
         except Exception as e:
             logger.error(f"更新用户配置失败: {e}")
