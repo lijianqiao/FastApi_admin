@@ -9,4 +9,15 @@
 
 from .logger import log_function_calls, logger
 
-__all__ = ["logger", "log_function_calls"]
+try:
+    from .token_blocklist import block_jti_async, is_jti_blocked
+except Exception:
+    block_jti = None  # type: ignore[assignment]
+    is_jti_blocked = None  # type: ignore[assignment]
+
+__all__ = [
+    "logger",
+    "log_function_calls",
+    "block_jti_async",
+    "is_jti_blocked",
+]

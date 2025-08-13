@@ -85,6 +85,31 @@ class RedisCache:
             logger.error(f"Redis设置缓存失败: {key}, 错误: {e}")
             return False
 
+    async def set_plain(self, key: str, value: bytes | str, ttl: int) -> bool:
+        """设置原始值（不pickle），用于布尔标记或字符串。
+
+        Args:
+            key: 键
+            value: 值（bytes或str）
+            ttl: 过期秒数
+
+        Returns:
+            是否成功
+        """
+        try:
+            client = await self._get_client()
+            if not client:
+                return False
+            if isinstance(value, str):
+                value_bytes = value.encode()
+            else:
+                value_bytes = value
+            result = await client.setex(key, ttl, value_bytes)
+            return bool(result)
+        except Exception as e:
+            logger.error(f"Redis set_plain 失败: {key}, 错误: {e}")
+            return False
+
     async def get(self, key: str) -> Any | None:
         """获取缓存值
 

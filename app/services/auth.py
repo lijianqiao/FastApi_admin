@@ -6,7 +6,7 @@
 @Docs: 认证服务层
 """
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from app.core.config import settings
@@ -19,8 +19,16 @@ from app.core.security import (
     verify_password,
 )
 from app.models.user import User
-from app.schemas.auth import ChangePasswordRequest, LoginRequest, TokenPayload, TokenResponse, UpdateProfileRequest
+from app.schemas.auth import (
+    ChangePasswordRequest,
+    LoginRequest,
+    RefreshTokenRequest,
+    TokenPayload,
+    TokenResponse,
+    UpdateProfileRequest,
+)
 from app.schemas.user import UserDetailResponse, UserResponse
+from app.utils.token_blocklist import block_jti_async
 
 
 class AuthService:
@@ -46,7 +54,7 @@ class AuthService:
 
         # 创建令牌
         expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        token_payload = {"sub": str(user.id)}
+        token_payload = {"sub": str(user.id), "username": user.username, "is_superuser": user.is_superuser, "is_active": user.is_active}
         access_token = create_access_token(data=token_payload, expires_delta=expires_delta)
         refresh_token = create_refresh_token(data=token_payload)
 
@@ -56,14 +64,25 @@ class AuthService:
             expires_in=int(expires_delta.total_seconds()),
         )
 
-    async def logout(self, user_id: UUID) -> None:
-        """用户登出"""
-        # JWT是无状态的，服务器端登出主要是为了记录或使刷新令牌失效（如果适用）
-        # 此处可以添加将token加入黑名单的逻辑
-        pass
+    async def logout(self, user_id: UUID, access_token: str | None = None) -> None:
+        """用户登出：将当前access token的jti拉黑，直至其过期。"""
+        if not access_token:
+            return
+        payload = security_manager.verify_token(access_token, "access")
+        if not payload:
+            return
+        jti = payload.get("jti")
+        exp_ts = payload.get("exp")
+        if not jti or not exp_ts:
+            return
+        # 计算剩余TTL
+        now = datetime.now(UTC).timestamp()
+        ttl = max(int(exp_ts - now), 0)
+        if ttl > 0:
+            await block_jti_async(jti, ttl)
 
     async def refresh_token(self, refresh_token: str) -> TokenResponse:
-        """刷新访问令牌"""
+        """刷新令牌轮换：校验refresh，拉黑旧refresh jti，颁发新access与新refresh。"""
         payload = security_manager.verify_token(refresh_token, "refresh")
         if not payload:
             raise UnauthorizedException("刷新令牌无效或已过期")
@@ -73,13 +92,24 @@ class AuthService:
         if not user or not user.is_active:
             raise UnauthorizedException("用户不存在或已被禁用")
 
+        # 拉黑旧refresh jti
+        old_jti = payload.get("jti")
+        exp_ts = payload.get("exp")
+        if old_jti and exp_ts:
+            now = datetime.now(UTC).timestamp()
+            ttl = max(int(exp_ts - now), 0)
+            if ttl > 0:
+                await block_jti_async(old_jti, ttl)
+
+        # 颁发新access与新refresh
         expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        new_token_payload = {"sub": str(user.id)}
-        new_access_token = create_access_token(data=new_token_payload, expires_delta=expires_delta)
+        base_payload = {"sub": str(user.id), "username": user.username, "is_superuser": user.is_superuser, "is_active": user.is_active}
+        new_access_token = create_access_token(data=base_payload, expires_delta=expires_delta)
+        new_refresh_token = create_refresh_token(data=base_payload)
 
         return TokenResponse(
             access_token=new_access_token,
-            refresh_token=refresh_token,  # 刷新令牌可以保持不变
+            refresh_token=new_refresh_token,
             expires_in=int(expires_delta.total_seconds()),
         )
 
@@ -118,6 +148,9 @@ class AuthService:
         if not verify_password(request.old_password, current_user.password_hash):
             raise BusinessException("旧密码错误")
 
+        # 密码强度校验
+        self._validate_password_strength(request.new_password)
+
         # 创建临时操作上下文（这里没有完整的请求上下文）
         from app.utils.deps import OperationContext
 
@@ -134,3 +167,21 @@ class AuthService:
             version=request.version,
             password_hash=new_password_hash,
         )
+
+    # ==================== 内部工具 ====================
+    @staticmethod
+    def _validate_password_strength(password: str) -> None:
+        """最小强度：长度>=8，包含大小写、数字、特殊字符中的三类。"""
+        import re
+
+        min_len = settings.PASSWORD_MIN_LENGTH
+        min_classes = settings.PASSWORD_MIN_CLASSES
+        if len(password) < min_len:
+            raise BusinessException("密码至少8位")
+        classes = 0
+        classes += 1 if re.search(r"[a-z]", password) else 0
+        classes += 1 if re.search(r"[A-Z]", password) else 0
+        classes += 1 if re.search(r"\d", password) else 0
+        classes += 1 if re.search(r"[^\w\s]", password) else 0
+        if classes < min_classes:
+            raise BusinessException("密码需包含大小写、数字、特殊字符中的至少三类")

@@ -101,9 +101,21 @@ class Settings(BaseSettings):
 
     # 安全配置
     SECRET_KEY: str = "your-secret-key"
+    # 可选：多密钥轮换（第一个为当前使用）。为空时仅使用 SECRET_KEY
+    SECRET_KEYS: list[str] | None = None
+    JWT_ENABLE_ROTATION: bool = Field(default=False)
+    JWT_ISSUER: str = Field(default="fastapi-admin")
+    JWT_AUDIENCE: str = Field(default="fastapi-admin-clients")
+    JWT_CLOCK_SKEW_SECONDS: int = Field(default=10)
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080
     ALGORITHM: str = Field(default="HS256")
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    ENABLE_2FA: bool = Field(default=False)
+
+    # 密码策略配置
+    PASSWORD_STRONG_POLICY_ENABLED: bool = Field(default=True)
+    PASSWORD_MIN_LENGTH: int = Field(default=8)
+    PASSWORD_MIN_CLASSES: int = Field(default=3)
 
     # 数据库配置
     DB_HOST: str = Field(default="localhost")
@@ -161,6 +173,8 @@ class Settings(BaseSettings):
     REDIS_PORT: int = Field(default=6379)
     REDIS_PASSWORD: SecretStr | None = None
     REDIS_DB: int = Field(default=0)
+    # JWT黑名单键前缀
+    JWT_BLOCKLIST_PREFIX: str = Field(default="jwt:blocklist:")
 
     # 权限缓存配置
     PERMISSION_CACHE_TTL: int = Field(default=600)
@@ -236,6 +250,15 @@ class Settings(BaseSettings):
         if len(v) < 32:
             raise ValueError("Secret_key必须至少32个字符长")
         return v
+
+    @property
+    def ALL_SECRET_KEYS(self) -> list[str]:
+        """返回密钥列表（用于密钥轮换），第一个为当前密钥。"""
+        if self.SECRET_KEYS and len(self.SECRET_KEYS) > 0:
+            # 去重并确保第一个为当前SECRET_KEY
+            keys = [self.SECRET_KEY] + [k for k in self.SECRET_KEYS if k != self.SECRET_KEY]
+            return keys
+        return [self.SECRET_KEY]
 
     @field_validator("DB_USER", "DB_NAME")
     @classmethod

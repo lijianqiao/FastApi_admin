@@ -10,6 +10,7 @@ import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import uuid4
 
 try:
     import jwt
@@ -30,10 +31,13 @@ class SecurityManager:
         self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
         # JWT配置
-        self.secret_key = settings.SECRET_KEY
+        self.secret_keys = settings.ALL_SECRET_KEYS
         self.algorithm = settings.ALGORITHM
         self.access_token_expire_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
         self.refresh_token_expire_days = settings.REFRESH_TOKEN_EXPIRE_DAYS
+        self.issuer = settings.JWT_ISSUER
+        self.audience = settings.JWT_AUDIENCE
+        self.clock_skew_seconds = settings.JWT_CLOCK_SKEW_SECONDS
 
     # ==================== 密码管理 ====================
     def hash_password(self, password: str) -> str:
@@ -76,8 +80,21 @@ class SecurityManager:
         else:
             expire = datetime.now(UTC) + timedelta(minutes=self.access_token_expire_minutes)
 
-        to_encode.update({"exp": expire, "type": "access"})
-        encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
+        jti = str(uuid4())
+        now = datetime.now(UTC)
+        to_encode.update(
+            {
+                "exp": expire,
+                "nbf": now,
+                "iat": now,
+                "iss": self.issuer,
+                "aud": self.audience,
+                "jti": jti,
+                "type": "access",
+                "kid": 0,
+            }
+        )
+        encoded_jwt = jwt.encode(to_encode, self.secret_keys[0], algorithm=self.algorithm, headers={"kid": 0})
         return encoded_jwt
 
     def create_refresh_token(self, data: dict[str, Any]) -> str:
@@ -91,22 +108,62 @@ class SecurityManager:
         """
         to_encode = data.copy()
         expire = datetime.now(UTC) + timedelta(days=self.refresh_token_expire_days)
-        to_encode.update({"exp": expire, "type": "refresh"})
-        encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
+        jti = str(uuid4())
+        now = datetime.now(UTC)
+        to_encode.update(
+            {
+                "exp": expire,
+                "nbf": now,
+                "iat": now,
+                "iss": self.issuer,
+                "aud": self.audience,
+                "jti": jti,
+                "type": "refresh",
+                "kid": 0,
+            }
+        )
+        encoded_jwt = jwt.encode(to_encode, self.secret_keys[0], algorithm=self.algorithm, headers={"kid": 0})
         return encoded_jwt
 
     def verify_token(self, token: str, token_type: str = "access") -> dict[str, Any] | None:
         """验证并解码JWT令牌"""
         try:
-            payload = jwt.decode(
-                token,
-                self.secret_key,
-                algorithms=[self.algorithm],
-            )
+            last_error: Exception | None = None
+            payload: dict[str, Any] | None = None
+            # 轮询所有密钥以支持密钥轮换
+            for _idx, key in enumerate(self.secret_keys):
+                try:
+                    payload = jwt.decode(
+                        token,
+                        key,
+                        algorithms=[self.algorithm],
+                        audience=self.audience,
+                        issuer=self.issuer,
+                        leeway=self.clock_skew_seconds,
+                    )
+                    break
+                except Exception as e:  # noqa: PERF203 - 逐个尝试
+                    last_error = e
+                    payload = None
+            if payload is None:
+                raise last_error or UnauthorizedException(detail="令牌无效")
 
             # 检查令牌类型
             if payload.get("type") != token_type:
                 raise UnauthorizedException(detail=f"令牌类型错误: 期望{token_type}类型") from None
+
+            # 黑名单检查（需要延迟导入避免循环）
+            try:
+                from app.utils.token_blocklist import is_jti_blocked
+
+                jti = payload.get("jti")
+                if jti and token_type in ("access", "refresh"):
+                    # 如果在黑名单，拒绝
+                    if is_jti_blocked(jti):
+                        raise UnauthorizedException(detail="令牌已失效")
+            except Exception as _:
+                # 黑名单模块不可用时忽略（仅在未配置Redis时）
+                pass
 
             return payload
         except jwt.ExpiredSignatureError as e:

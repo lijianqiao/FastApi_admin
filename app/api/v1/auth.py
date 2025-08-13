@@ -9,6 +9,7 @@
 from fastapi import APIRouter, Depends, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi_throttle import RateLimiter
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.models.user import User
 from app.schemas.auth import (
@@ -25,6 +26,9 @@ from app.utils.deps import get_auth_service, get_current_active_user
 
 router = APIRouter(prefix="/auth", tags=["认证管理"])
 login_limiter = RateLimiter(times=3, seconds=10)  # 限制登录请求频率为每10秒3次
+refresh_limiter = RateLimiter(times=10, seconds=60)
+password_limiter = RateLimiter(times=5, seconds=60)
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 @router.post("/login", response_model=TokenResponse, summary="用户登录", dependencies=[Depends(login_limiter)])
@@ -56,13 +60,15 @@ async def login_form(
 async def logout(
     auth_service: AuthService = Depends(get_auth_service),
     current_user: User = Depends(get_current_active_user),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ):
     """用户登出接口"""
-    await auth_service.logout(current_user.id)
+    access_token = credentials.credentials if credentials else None
+    await auth_service.logout(current_user.id, access_token)
     return SuccessResponse()
 
 
-@router.post("/refresh", response_model=TokenResponse, summary="刷新令牌")
+@router.post("/refresh", response_model=TokenResponse, summary="刷新令牌", dependencies=[Depends(refresh_limiter)])
 async def refresh_token(
     refresh_data: RefreshTokenRequest,
     auth_service: AuthService = Depends(get_auth_service),
@@ -92,7 +98,7 @@ async def update_profile(
     return BaseResponse(data=user, message="用户信息更新成功")
 
 
-@router.put("/password", response_model=SuccessResponse, summary="修改密码")
+@router.put("/password", response_model=SuccessResponse, summary="修改密码", dependencies=[Depends(password_limiter)])
 async def change_password(
     password_data: ChangePasswordRequest,
     auth_service: AuthService = Depends(get_auth_service),
