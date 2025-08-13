@@ -12,6 +12,7 @@ from uuid import UUID
 from app.core.exceptions import BusinessException
 from app.dao.permission import PermissionDAO
 from app.dao.role import RoleDAO
+from app.dao.user import UserDAO
 from app.models.permission import Permission
 from app.schemas.permission import (
     PermissionCreateRequest,
@@ -26,6 +27,9 @@ from app.utils.operation_logger import (
     log_delete_with_context,
     log_query_with_context,
     log_update_with_context,
+)
+from app.utils.permission_cache_utils import (
+    invalidate_permission_cache,
 )
 from app.utils.query_utils import list_query_to_orm_filters
 
@@ -77,7 +81,9 @@ class PermissionService(BaseService[Permission]):
 
     @log_create_with_context("permission")
     async def create_permission(
-        self, request: PermissionCreateRequest, operation_context: OperationContext,
+        self,
+        request: PermissionCreateRequest,
+        operation_context: OperationContext,
     ) -> PermissionResponse:
         """创建权限.
 
@@ -101,8 +107,12 @@ class PermissionService(BaseService[Permission]):
         return PermissionResponse.model_validate(permission)
 
     @log_update_with_context("permission")
+    @invalidate_permission_cache("permission_id")
     async def update_permission(
-        self, permission_id: UUID, request: PermissionUpdateRequest, operation_context: OperationContext,
+        self,
+        permission_id: UUID,
+        request: PermissionUpdateRequest,
+        operation_context: OperationContext,
     ) -> PermissionResponse:
         """更新权限.
 
@@ -126,7 +136,10 @@ class PermissionService(BaseService[Permission]):
             raise BusinessException(msg)
 
         updated_permission = await self.update(
-            permission_id, operation_context=operation_context, version=version, **update_data,
+            permission_id,
+            operation_context=operation_context,
+            version=version,
+            **update_data,
         )
         if not updated_permission:
             msg = "权限更新失败或版本冲突"
@@ -134,6 +147,7 @@ class PermissionService(BaseService[Permission]):
         return PermissionResponse.model_validate(updated_permission)
 
     @log_delete_with_context("permission")
+    @invalidate_permission_cache("permission_id")
     async def delete_permission(self, permission_id: UUID, operation_context: OperationContext) -> None:
         """删除权限, 先检查是否被角色使用.
 
@@ -153,7 +167,9 @@ class PermissionService(BaseService[Permission]):
 
     @log_query_with_context("permission")
     async def get_permissions(
-        self, query: PermissionListRequest, _operation_context: OperationContext,
+        self,
+        query: PermissionListRequest,
+        _operation_context: OperationContext,
     ) -> tuple[list[PermissionResponse], int]:
         """获取权限列表.
 
@@ -187,8 +203,35 @@ class PermissionService(BaseService[Permission]):
 
         if not permissions:
             return [], 0
-        result = [PermissionResponse.model_validate(p) for p in permissions]
-        return result, total
+
+        # 统计 role_count / user_count（去重）
+        from tortoise.expressions import Q
+
+        user_dao = UserDAO()
+        results: list[PermissionResponse] = []
+        for perm in permissions:
+            try:
+                role_count = await self.role_dao.count(permissions__id=perm.id, is_deleted=False)
+            except Exception:
+                role_count = 0
+
+            try:
+                user_count = await user_dao.model.filter(
+                    Q(permissions__id=perm.id) | Q(roles__permissions__id=perm.id),
+                    is_deleted=False,
+                ).distinct().count()
+            except Exception:
+                user_count = 0
+
+            item = PermissionResponse.model_validate(perm)
+            try:
+                item.role_count = role_count  # type: ignore[attr-defined]
+                item.user_count = user_count  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            results.append(item)
+
+        return results, total
 
     @log_query_with_context("permission")
     async def get_all_permissions(self, _operation_context: OperationContext) -> list[PermissionResponse]:
@@ -206,7 +249,9 @@ class PermissionService(BaseService[Permission]):
 
     @log_query_with_context("permission")
     async def get_permission_detail(
-        self, permission_id: UUID, _operation_context: OperationContext,
+        self,
+        permission_id: UUID,
+        _operation_context: OperationContext,
     ) -> PermissionResponse:
         """根据ID获取权限详情.
 
@@ -225,10 +270,36 @@ class PermissionService(BaseService[Permission]):
         if not permission:
             msg = "权限未找到"
             raise BusinessException(msg)
-        return PermissionResponse.model_validate(permission)
+        # 统计
+        from tortoise.expressions import Q
+        user_dao = UserDAO()
+        try:
+            role_count = await self.role_dao.count(permissions__id=permission.id, is_deleted=False)
+        except Exception:
+            role_count = 0
+        try:
+            user_count = await user_dao.model.filter(
+                Q(permissions__id=permission.id) | Q(roles__permissions__id=permission.id),
+                is_deleted=False,
+            ).distinct().count()
+        except Exception:
+            user_count = 0
 
+        resp = PermissionResponse.model_validate(permission)
+        try:
+            resp.role_count = role_count  # type: ignore[attr-defined]
+            resp.user_count = user_count  # type: ignore[attr-defined]
+        except Exception:
+            pass
+        return resp
+
+    @invalidate_permission_cache("permission_id")
     async def update_permission_status(
-        self, permission_id: UUID, *, is_active: bool, operation_context: OperationContext,
+        self,
+        permission_id: UUID,
+        *,
+        is_active: bool,
+        operation_context: OperationContext,
     ) -> None:
         """更新权限状态.
 

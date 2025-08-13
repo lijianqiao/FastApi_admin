@@ -7,9 +7,8 @@
 """
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordRequestForm
 from fastapi_throttle import RateLimiter
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.models.user import User
 from app.schemas.auth import (

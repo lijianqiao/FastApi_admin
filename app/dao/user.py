@@ -341,20 +341,44 @@ class UserDAO(BaseDAO[User]):
             logger.error(f"根据角色ID获取用户ID列表失败: {e}")
             return []
 
-    async def get_user_ids_by_role(self, role_id: UUID) -> list[UUID]:
-        """根据角色ID获取用户ID列表.
+    async def get_user_ids_by_role(self, role_id: UUID, *, explain: bool = False) -> list[UUID]:
+        """根据角色ID获取用户ID列表。
 
         Args:
             role_id: 角色ID
+            explain: 是否输出执行计划到日志
 
         Returns:
             list[UUID]: 用户ID列表
         """
-        # 这是一个用于性能的原始 SQL 查询，因为 ORM 对于多对多筛选可能很复杂。
-        conn = self.model._meta.db
-        query = 'SELECT user_id FROM "user_roles" WHERE role_id = $1'
-        results = await conn.execute_query_dict(query, [role_id])
-        return [row["user_id"] for row in results]
+        try:
+            base_qs = self.model.filter(roles__id=role_id, is_deleted=False).distinct()
+            if explain:
+                await self.explain(base_qs)
+            qs_values = base_qs.values_list("id")
+            users = await qs_values
+            return [user_id for (user_id,) in users]
+        except Exception as e:
+            logger.error(f"根据角色ID获取用户ID列表失败: {e}")
+            return []
+
+    async def get_user_ids_by_permission_deep(self, permission_id: UUID, *, explain: bool = False) -> list[UUID]:
+        """获取拥有某权限的所有用户（包含直接权限与角色继承）。"""
+        try:
+            from tortoise.expressions import Q as _Q
+
+            base_qs = self.model.filter(
+                _Q(permissions__id=permission_id) | _Q(roles__permissions__id=permission_id),
+                is_deleted=False,
+            ).distinct()
+            if explain:
+                await self.explain(base_qs)
+            qs_values = base_qs.values_list("id")
+            users = await qs_values
+            return [user_id for (user_id,) in users]
+        except Exception as e:
+            logger.error(f"根据权限获取受影响用户失败: {e}")
+            return []
 
     # 用户-角色关系管理
     async def set_user_roles(self, user: User, role_ids: list[UUID]) -> None:

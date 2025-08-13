@@ -91,10 +91,9 @@ class SecurityManager:
                 "aud": self.audience,
                 "jti": jti,
                 "type": "access",
-                "kid": 0,
             }
         )
-        encoded_jwt = jwt.encode(to_encode, self.secret_keys[0], algorithm=self.algorithm, headers={"kid": 0})
+        encoded_jwt = jwt.encode(to_encode, self.secret_keys[0], algorithm=self.algorithm)
         return encoded_jwt
 
     def create_refresh_token(self, data: dict[str, Any]) -> str:
@@ -119,10 +118,9 @@ class SecurityManager:
                 "aud": self.audience,
                 "jti": jti,
                 "type": "refresh",
-                "kid": 0,
             }
         )
-        encoded_jwt = jwt.encode(to_encode, self.secret_keys[0], algorithm=self.algorithm, headers={"kid": 0})
+        encoded_jwt = jwt.encode(to_encode, self.secret_keys[0], algorithm=self.algorithm)
         return encoded_jwt
 
     def verify_token(self, token: str, token_type: str = "access") -> dict[str, Any] | None:

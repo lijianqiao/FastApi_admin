@@ -27,18 +27,13 @@ class PermissionCache:
 
     def __init__(self):
         self.cache_ttl = settings.PERMISSION_CACHE_TTL
-        self.enable_redis = settings.ENABLE_REDIS_CACHE
-        logger.info(f"权限缓存配置: Redis启用={self.enable_redis}, TTL={self.cache_ttl}秒")
+        # 统一使用Redis作为权限缓存；不可用时降级内存，仅记录警告
+        self.enable_redis = True
+        logger.info(f"权限缓存配置: 统一Redis, TTL={self.cache_ttl}秒")
 
     async def _get_cache_backend(self):
         """获取缓存后端"""
-        if not self.enable_redis:
-            logger.info("权限缓存: 配置禁用Redis，使用内存缓存")
-            from app.utils.redis_cache import _memory_fallback
-
-            return _memory_fallback
-
-        # 配置启用Redis时尝试连接
+        # 优先使用Redis，失败时降级内存
         try:
             from app.utils.redis_cache import get_redis_cache
 
@@ -204,7 +199,7 @@ class PermissionCache:
         cache_backend = await self._get_cache_backend()
         backend_type = cache_backend.__class__.__name__
 
-        logger.debug(f"获取缓存统计: 后端类型={backend_type}, 配置启用Redis={self.enable_redis}")
+        logger.debug(f"获取缓存统计: 后端类型={backend_type}, 统一Redis={True}")
 
         # 检查是否为Redis缓存后端（通过类名判断）
         if backend_type == "RedisCache":
@@ -220,7 +215,7 @@ class PermissionCache:
                         "permission_keys": keys_count,
                         "memory_usage": info.get("used_memory_human", "N/A"),
                         "ttl": self.cache_ttl,
-                        "enable_redis_config": self.enable_redis,
+                        "enable_redis_config": True,
                     }
                     logger.debug(f"Redis缓存统计详情: {stats}")
                     return stats
@@ -233,7 +228,7 @@ class PermissionCache:
             "backend_class": backend_type,
             "permission_keys": len(getattr(cache_backend, "_cache", {})),
             "ttl": self.cache_ttl,
-            "enable_redis_config": self.enable_redis,
+            "enable_redis_config": True,
         }
         logger.debug(f"内存缓存统计详情: {stats}")
         return stats

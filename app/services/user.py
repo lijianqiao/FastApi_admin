@@ -266,6 +266,7 @@ class UserService(BaseService[User]):
             return None
         return user
 
+    @invalidate_user_permission_cache("user_id")
     async def update_user_status(self, user_id: UUID, *, is_active: bool, operation_context: OperationContext) -> None:
         """更新用户状态.
 
@@ -427,6 +428,7 @@ class UserService(BaseService[User]):
         await self.dao.set_user_permissions(user_id, request.permission_ids)
         return await self.get_user_detail(user_id, operation_context)
 
+    @invalidate_user_permission_cache("user_id")
     async def add_user_permissions(
         self,
         user_id: UUID,
@@ -455,6 +457,7 @@ class UserService(BaseService[User]):
         await self.dao.add_user_permissions(user_id, permission_ids)
         return await self.get_user_detail(user_id, operation_context)
 
+    @invalidate_user_permission_cache("user_id")
     async def remove_user_permissions(
         self,
         user_id: UUID,

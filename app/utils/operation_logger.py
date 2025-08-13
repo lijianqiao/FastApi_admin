@@ -16,6 +16,7 @@ from uuid import UUID, uuid4
 
 from app.dao.operation_log import OperationLogDAO
 from app.utils.logger import logger
+from app.utils.request_context import get_request_id
 
 
 class OperationContext:
@@ -185,6 +186,9 @@ def _build_description(context: OperationContext) -> str:
         parts.append(f"ID: {context.resource_id}")
     if context.error_message:
         parts.append(f"错误: {context.error_message}")
+    req_id = get_request_id()
+    if req_id:
+        parts.append(f"req_id: {req_id}")
     return " | ".join(parts)
 
 

@@ -10,6 +10,8 @@ import time
 from collections import defaultdict
 from typing import Any
 
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
+
 from app.core.config import settings
 
 
@@ -24,6 +26,17 @@ class MetricsCollector:
         self._total_requests: int = 0
         self._total_errors: int = 0
 
+        # Prometheus 指标
+        self.prom_request_total = Counter("http_requests_total", "HTTP请求总数", ["method", "path", "status"])
+        self.prom_request_latency = Histogram(
+            "http_request_duration_seconds",
+            "HTTP请求延迟（秒）",
+            ["method", "path", "status"],
+            buckets=(0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5),
+        )
+        self.prom_errors_total = Counter("http_errors_total", "HTTP错误总数", ["method", "path", "status"])
+        self.prom_active_connections = Gauge("active_connections", "活跃连接数")
+
     def record_request(self, method: str, path: str, status_code: int, duration: float) -> None:
         """记录请求指标"""
         if not settings.ENABLE_PERFORMANCE_MONITORING:
@@ -34,9 +47,15 @@ class MetricsCollector:
         self._request_duration[endpoint].append(duration)
         self._total_requests += 1
 
+        # Prometheus
+        status = str(status_code)
+        self.prom_request_total.labels(method, path, status).inc()
+        self.prom_request_latency.labels(method, path, status).observe(duration)
+
         if status_code >= 400:
             self._error_count[endpoint] += 1
             self._total_errors += 1
+            self.prom_errors_total.labels(method, path, status).inc()
 
     def record_database_operation(self, operation: str, duration: float) -> None:
         """记录数据库操作指标"""
@@ -48,10 +67,12 @@ class MetricsCollector:
     def increment_active_connections(self) -> None:
         """增加活跃连接数"""
         self._active_connections += 1
+        self.prom_active_connections.inc()
 
     def decrement_active_connections(self) -> None:
         """减少活跃连接数"""
         self._active_connections = max(0, self._active_connections - 1)
+        self.prom_active_connections.dec()
 
     def get_metrics(self) -> dict[str, Any]:
         """获取所有指标"""
@@ -85,6 +106,12 @@ class MetricsCollector:
             }
 
         return metrics
+
+    # ===== Prometheus 导出 =====
+    @staticmethod
+    def prometheus_exposition() -> tuple[str, str]:
+        """返回Prometheus暴露内容和Content-Type。"""
+        return generate_latest().decode("utf-8"), CONTENT_TYPE_LATEST
 
     def reset_metrics(self) -> None:
         """重置指标"""

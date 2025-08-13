@@ -22,7 +22,6 @@ from app.models.user import User
 from app.schemas.auth import (
     ChangePasswordRequest,
     LoginRequest,
-    RefreshTokenRequest,
     TokenPayload,
     TokenResponse,
     UpdateProfileRequest,
@@ -54,7 +53,12 @@ class AuthService:
 
         # 创建令牌
         expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        token_payload = {"sub": str(user.id), "username": user.username, "is_superuser": user.is_superuser, "is_active": user.is_active}
+        token_payload = {
+            "sub": str(user.id),
+            "username": user.username,
+            "is_superuser": user.is_superuser,
+            "is_active": user.is_active,
+        }
         access_token = create_access_token(data=token_payload, expires_delta=expires_delta)
         refresh_token = create_refresh_token(data=token_payload)
 
@@ -103,7 +107,12 @@ class AuthService:
 
         # 颁发新access与新refresh
         expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        base_payload = {"sub": str(user.id), "username": user.username, "is_superuser": user.is_superuser, "is_active": user.is_active}
+        base_payload = {
+            "sub": str(user.id),
+            "username": user.username,
+            "is_superuser": user.is_superuser,
+            "is_active": user.is_active,
+        }
         new_access_token = create_access_token(data=base_payload, expires_delta=expires_delta)
         new_refresh_token = create_refresh_token(data=base_payload)
 

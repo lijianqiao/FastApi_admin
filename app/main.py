@@ -9,11 +9,13 @@
 """
 
 from fastapi import FastAPI
+from fastapi.responses import PlainTextResponse
 
 from app.core.config import settings
 from app.core.events import lifespan
 from app.core.exceptions import setup_exception_handlers
 from app.core.middleware import setup_middlewares
+from app.utils.metrics import metrics_collector
 
 
 def register_routes(app: FastAPI) -> None:
@@ -50,6 +52,14 @@ def create_app() -> FastAPI:
     async def root():
         """根路由"""
         return {"message": "欢迎来到网络自动化管理平台系统!"}
+
+    # Prometheus 指标暴露
+    if settings.ENABLE_METRICS:
+
+        @app.get(settings.METRICS_PATH, include_in_schema=False)
+        async def metrics():
+            body, content_type = metrics_collector.prometheus_exposition()
+            return PlainTextResponse(body, media_type=content_type)
 
     return app
 

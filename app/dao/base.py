@@ -14,6 +14,7 @@ from uuid import UUID
 from tortoise.exceptions import DoesNotExist, IntegrityError
 from tortoise.queryset import QuerySet
 from tortoise.transactions import in_transaction
+from tortoise.connection import connections
 
 from app.core.exceptions import (
     DatabaseConnectionException,
@@ -591,6 +592,25 @@ class BaseDAO[T: BaseModel]:
         if not include_deleted:
             valid_filters["is_deleted"] = False
         return self.model.filter(**valid_filters)
+
+    async def explain(self, queryset: QuerySet[T]) -> str:
+        """返回数据库执行计划，便于性能诊断（PostgreSQL EXPLAIN）。"""
+        try:
+            sql, params = queryset.sql()
+            explain_sql = f"EXPLAIN {sql}"
+            conn = connections.get("default")
+            rows = await conn.execute_query(explain_sql, params)
+            # rows[0] 是 (records, columns) 结构，兼容不同返回
+            if isinstance(rows, tuple) and len(rows) >= 1:
+                records = rows[0]
+                plan = "\n".join(str(r) for r in records)
+            else:
+                plan = str(rows)
+            logger.debug(f"执行计划:\n{plan}")
+            return plan
+        except Exception as e:
+            logger.error(f"获取执行计划失败: {e}")
+            return str(e)
 
     async def bulk_upsert(
         self, objects_data: list[dict[str, Any]], conflict_fields: list[str], update_fields: list[str] | None = None

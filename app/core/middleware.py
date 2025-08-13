@@ -22,6 +22,8 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.core.config import settings
 from app.utils.logger import logger
+from app.utils.metrics import metrics_collector
+from app.utils.request_context import clear_client_ip, clear_request_id, set_client_ip, set_request_id
 
 
 # 简单的内存限流器
@@ -73,6 +75,9 @@ class RequestLoggerMiddleware(BaseHTTPMiddleware):
         """处理请求并记录日志"""
         start_time = time.time()
         request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+        # 写入上下文变量
+        set_request_id(request_id)
+        set_client_ip(request.client.host if request.client else "unknown")
 
         logger.info(f"Request started: {request.method} {request.url.path} [ID: {request_id}]")
 
@@ -82,10 +87,21 @@ class RequestLoggerMiddleware(BaseHTTPMiddleware):
         response.headers["X-Process-Time"] = str(process_time)
         response.headers["X-Request-ID"] = request_id
 
+        # 记录指标
+        try:
+            metrics_collector.record_request(request.method, request.url.path, response.status_code, process_time)
+        except Exception:
+            pass
+
         logger.info(
             f"Request finished: {request.method} {request.url.path} Status: {response.status_code} [ID: {request_id}]"
         )
-        return response
+        try:
+            return response
+        finally:
+            # 清理上下文
+            clear_request_id()
+            clear_client_ip()
 
 
 def setup_middlewares(app: FastAPI) -> None:

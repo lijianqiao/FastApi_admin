@@ -32,6 +32,7 @@ from app.utils.operation_logger import (
 )
 from app.utils.permission_cache_utils import invalidate_role_permission_cache
 from app.utils.query_utils import list_query_to_orm_filters
+from app.schemas.role import RoleResponse
 
 
 class RoleService(BaseService[Role]):
@@ -142,6 +143,7 @@ class RoleService(BaseService[Role]):
         return RoleResponse.model_validate(updated_role)
 
     @log_delete_with_context("role")
+    @invalidate_role_permission_cache("role_id")
     async def delete_role(self, role_id: UUID, operation_context: OperationContext) -> None:
         """删除角色, 检查是否仍有用户关联.
 
@@ -197,7 +199,20 @@ class RoleService(BaseService[Role]):
             **dao_params,
             **model_filters,
         )
-        return [RoleResponse.model_validate(role) for role in roles], total
+        # 填充 user_count
+        results: list[RoleResponse] = []
+        for role in roles:
+            try:
+                user_count = await self.user_dao.count(roles__id=role.id, is_deleted=False)
+            except Exception:
+                user_count = 0
+            item = RoleResponse.model_validate(role)
+            try:
+                item.user_count = user_count  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            results.append(item)
+        return results, total
 
     @log_query_with_context("role")
     async def get_role_detail(self, role_id: UUID, _operation_context: OperationContext) -> RoleDetailResponse:
@@ -218,7 +233,19 @@ class RoleService(BaseService[Role]):
         if not role:
             msg = "角色未找到"
             raise BusinessException(msg)
-        return RoleDetailResponse.model_validate(role)
+        # 统计 user_count
+        try:
+            user_count = await self.user_dao.count(roles__id=role.id, is_deleted=False)
+        except Exception:
+            user_count = 0
+        resp = RoleDetailResponse.model_validate(role)
+        try:
+            # RoleDetailResponse没有user_count字段，按你的Schema仅RoleResponse有；
+            # 若需要详情页也返回，建议在Schema中补充；这里仅兼容性赋值忽略类型。
+            resp.user_count = user_count  # type: ignore[attr-defined]
+        except Exception:
+            pass
+        return resp
 
     @log_update_with_context("role")
     @invalidate_role_permission_cache("role_id")

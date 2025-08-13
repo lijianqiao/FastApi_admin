@@ -11,6 +11,7 @@ from collections.abc import Callable
 from uuid import UUID
 
 from app.core.permissions.simple_decorators import permission_manager
+from app.dao.user import UserDAO
 from app.utils.logger import logger
 
 
@@ -118,3 +119,52 @@ async def clear_all_permission_cache():
 async def get_permission_cache_stats():
     """获取权限缓存统计"""
     return await permission_manager.get_cache_stats()
+
+
+# ============== 基于权限ID的失效（影响所有拥有该权限的用户） ==============
+
+
+async def clear_permission_affected_users(permission_id: UUID) -> None:
+    """清除拥有某权限（直接或经由角色）的用户权限缓存。"""
+    user_dao = UserDAO()
+    user_ids = await user_dao.get_user_ids_by_permission_deep(permission_id)
+    if not user_ids:
+        return
+    for uid in user_ids:
+        try:
+            await permission_manager.clear_user_cache(UUID(str(uid)))
+        except Exception as e:
+            logger.error(f"清除用户权限缓存失败 user={uid}: {e}")
+
+
+def invalidate_permission_cache(permission_id_param: UUID | str):
+    """装饰器：在权限被更新/删除/状态变更后，清除所有受影响用户的权限缓存。
+
+    Args:
+        permission_id_param: 可传入实际UUID，或在被装饰函数的kwargs中的参数名（str）
+    """
+
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            result = await func(*args, **kwargs)
+
+            try:
+                target_permission_id = permission_id_param
+                if isinstance(permission_id_param, str) and permission_id_param in kwargs:
+                    target_permission_id = kwargs[permission_id_param]
+                elif hasattr(args, "__len__") and len(args) > 0:
+                    # 尝试从第一个参数（通常是self）后的位置推断，不做复杂解析
+                    pass
+
+                if target_permission_id:
+                    await clear_permission_affected_users(UUID(str(target_permission_id)))
+                    logger.info(f"权限变更导致的用户缓存清除完成: permission={target_permission_id}")
+            except Exception as e:
+                logger.error(f"清除权限影响的用户缓存失败: {e}")
+
+            return result
+
+        return wrapper
+
+    return decorator
