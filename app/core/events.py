@@ -7,8 +7,8 @@
 @Docs: 应用程序事件管理
 """
 
-from contextlib import asynccontextmanager
 import asyncio
+from contextlib import asynccontextmanager
 from typing import Any
 
 import redis.asyncio as redis
