@@ -42,34 +42,40 @@ class RequestLoggerMiddleware(BaseHTTPMiddleware):
     """请求日志中间件"""
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        """处理请求并记录日志"""
+        """处理请求并记录日志（异常也计入指标）"""
         start_time = time.time()
         request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
-        # 写入上下文变量
         set_request_id(request_id)
         set_client_ip(request.client.host if request.client else "unknown")
 
         logger.info(f"Request started: {request.method} {request.url.path} [ID: {request_id}]")
 
-        response = await call_next(request)
-
-        process_time = time.time() - start_time
-        response.headers["X-Process-Time"] = str(process_time)
-        response.headers["X-Request-ID"] = request_id
-
-        # 记录指标
         try:
-            metrics_collector.record_request(request.method, request.url.path, response.status_code, process_time)
-        except Exception:
-            pass
-
-        logger.info(
-            f"Request finished: {request.method} {request.url.path} Status: {response.status_code} [ID: {request_id}]"
-        )
-        try:
+            response = await call_next(request)
+            process_time = time.time() - start_time
+            response.headers["X-Process-Time"] = str(process_time)
+            response.headers["X-Request-ID"] = request_id
+            try:
+                metrics_collector.record_request(request.method, request.url.path, response.status_code, process_time)
+            except Exception:
+                pass
+            logger.info(
+                f"Request finished: {request.method} {request.url.path} Status: {response.status_code} [ID: {request_id}]"
+            )
             return response
+        except Exception as e:
+            # 异常路径也统计
+            process_time = time.time() - start_time
+            status_code = getattr(e, "status_code", 500)
+            try:
+                metrics_collector.record_request(request.method, request.url.path, status_code, process_time)
+            except Exception:
+                pass
+            logger.exception(
+                f"Request error: {request.method} {request.url.path} Status: {status_code} [ID: {request_id}]"
+            )
+            raise
         finally:
-            # 清理上下文
             clear_request_id()
             clear_client_ip()
 
@@ -95,7 +101,8 @@ def setup_middlewares(app: FastAPI) -> None:
     app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 
     # 请求日志中间件
-    app.add_middleware(RequestLoggerMiddleware)
+    if settings.ENABLE_REQUEST_TRACKING:
+        app.add_middleware(RequestLoggerMiddleware)
 
     # 安全中间件（生产环境）
     if settings.IS_PRODUCTION and settings.ENABLE_TRUSTED_HOST and settings.ALLOWED_HOSTS:

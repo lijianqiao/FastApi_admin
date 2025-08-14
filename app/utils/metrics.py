@@ -67,6 +67,13 @@ class MetricsCollector:
 
         self._request_duration[f"db_{operation}"].append(duration)
 
+    # 便捷API
+    def record_ok(self, method: str, path: str, duration: float) -> None:
+        self.record_request(method, path, 200, duration)
+
+    def record_error(self, method: str, path: str, duration: float, status_code: int = 500) -> None:
+        self.record_request(method, path, status_code, duration)
+
     def increment_active_connections(self) -> None:
         """增加活跃连接数"""
         self._active_connections += 1
