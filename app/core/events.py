@@ -8,6 +8,8 @@
 """
 
 from contextlib import asynccontextmanager
+import asyncio
+from typing import Any
 
 import redis.asyncio as redis
 from fastapi import FastAPI
@@ -53,6 +55,9 @@ async def startup(app: FastAPI) -> None:
     # 初始化权限缓存
     await init_permission_cache()
 
+    # 启动日志归档后台任务
+    await start_log_archive_task(app)
+
     logger.info(f"应用程序 {settings.APP_NAME} 启动完成")
 
 
@@ -70,6 +75,9 @@ async def shutdown(app: FastAPI) -> None:
     # 关闭Redis连接
     await clear_all_permission_cache()  # 清除权限缓存
     await close_redis(app)
+
+    # 停止日志归档后台任务
+    await stop_log_archive_task(app)
 
     logger.info(f"应用程序 {settings.APP_NAME} 已关闭")
 
@@ -152,3 +160,54 @@ async def init_permission_cache() -> None:
     except Exception as e:
         logger.error(f"权限缓存系统初始化失败: {e}")
         logger.info("将使用内存缓存作为备用方案")
+
+
+# ========== 日志归档后台任务 ==========
+async def _log_archive_worker(app: FastAPI) -> None:
+    """后台协程：定时压缩与归档操作日志。"""
+    from app.utils.log_compression import compress_old_logs
+
+    interval_seconds = max(1, settings.LOG_ARCHIVE_INTERVAL_HOURS) * 3600
+    keep_days = max(1, settings.LOG_ARCHIVE_KEEP_DAYS)
+
+    while True:
+        try:
+            if settings.LOG_ARCHIVE_ENABLED:
+                result: dict[str, Any] = await compress_old_logs(keep_days)
+                # 仅在有数据时打印关键信息，避免噪声
+                if isinstance(result, dict) and result.get("operation_logs", {}).get("compressed", 0) > 0:
+                    logger.info(
+                        f"日志归档完成: 压缩 {result['operation_logs']['compressed']} 条, "
+                        f"删除 {result['operation_logs']['deleted']} 条, 节省 {result['operation_logs']['size_saved']} bytes"
+                    )
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"日志归档任务执行失败: {e}")
+
+        # 等待下一次执行
+        try:
+            await asyncio.sleep(interval_seconds)
+        except asyncio.CancelledError:
+            break
+
+
+async def start_log_archive_task(app: FastAPI) -> None:
+    """启动日志归档任务。"""
+    if not settings.LOG_ARCHIVE_ENABLED:
+        logger.info("日志归档任务未启用")
+        return
+    app.state.log_archive_task = asyncio.create_task(_log_archive_worker(app))
+    logger.info(
+        f"日志归档任务已启动：每 {settings.LOG_ARCHIVE_INTERVAL_HOURS} 小时执行一次，保留 {settings.LOG_ARCHIVE_KEEP_DAYS} 天"
+    )
+
+
+async def stop_log_archive_task(app: FastAPI) -> None:
+    """停止日志归档任务。"""
+    task = getattr(app.state, "log_archive_task", None)
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        logger.info("日志归档任务已停止")

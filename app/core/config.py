@@ -215,6 +215,11 @@ class Settings(BaseSettings):
     ENABLE_REQUEST_TRACKING: bool = Field(default=True)
     ENABLE_PERFORMANCE_MONITORING: bool = Field(default=True)
 
+    # 日志归档/压缩配置
+    LOG_ARCHIVE_ENABLED: bool = Field(default=True)
+    LOG_ARCHIVE_KEEP_DAYS: int = Field(default=30)
+    LOG_ARCHIVE_INTERVAL_HOURS: int = Field(default=24)
+
     # 超级管理员配置
     SUPERUSER_USERNAME: str = Field(default="admin")
     SUPERUSER_PASSWORD: str = Field(default="Admin@123")
