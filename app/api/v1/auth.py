@@ -8,7 +8,6 @@
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordRequestForm
-from fastapi_throttle import RateLimiter
 
 from app.models.user import User
 from app.schemas.auth import (
@@ -22,15 +21,16 @@ from app.schemas.base import BaseResponse, SuccessResponse
 from app.schemas.user import UserDetailResponse, UserResponse
 from app.services.auth import AuthService
 from app.utils.deps import get_auth_service, get_current_active_user
+from app.utils.rate_limit import rate_limit
 
 router = APIRouter(prefix="/auth", tags=["认证管理"])
-login_limiter = RateLimiter(times=3, seconds=10)  # 限制登录请求频率为每10秒3次
-refresh_limiter = RateLimiter(times=10, seconds=60)
-password_limiter = RateLimiter(times=5, seconds=60)
+login_limiter = Depends(rate_limit("auth:login", times=2, seconds=10))
+refresh_limiter = Depends(rate_limit("auth:refresh", times=10, seconds=60))
+password_limiter = Depends(rate_limit("auth:password", times=5, seconds=60))
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
-@router.post("/login", response_model=TokenResponse, summary="用户登录", dependencies=[Depends(login_limiter)])
+@router.post("/login", response_model=TokenResponse, summary="用户登录", dependencies=[login_limiter])
 async def login(
     login_data: LoginRequest,
     request: Request,
@@ -42,7 +42,7 @@ async def login(
     return await auth_service.login(login_data, client_ip, user_agent)
 
 
-@router.post("/login/form", response_model=TokenResponse, summary="表单登录", dependencies=[Depends(login_limiter)])
+@router.post("/login/form", response_model=TokenResponse, summary="表单登录", dependencies=[login_limiter])
 async def login_form(
     request: Request,
     auth_service: AuthService = Depends(get_auth_service),
@@ -67,7 +67,7 @@ async def logout(
     return SuccessResponse()
 
 
-@router.post("/refresh", response_model=TokenResponse, summary="刷新令牌", dependencies=[Depends(refresh_limiter)])
+@router.post("/refresh", response_model=TokenResponse, summary="刷新令牌", dependencies=[refresh_limiter])
 async def refresh_token(
     refresh_data: RefreshTokenRequest,
     auth_service: AuthService = Depends(get_auth_service),
@@ -97,7 +97,7 @@ async def update_profile(
     return BaseResponse(data=user, message="用户信息更新成功")
 
 
-@router.put("/password", response_model=SuccessResponse, summary="修改密码", dependencies=[Depends(password_limiter)])
+@router.put("/password", response_model=SuccessResponse, summary="修改密码", dependencies=[password_limiter])
 async def change_password(
     password_data: ChangePasswordRequest,
     auth_service: AuthService = Depends(get_auth_service),

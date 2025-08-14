@@ -9,10 +9,9 @@
 
 import time
 import uuid
-from collections import defaultdict
 from collections.abc import Callable
 
-from fastapi import FastAPI, HTTPException, Request, Response, status
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
@@ -23,35 +22,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.core.config import settings
 from app.utils.logger import logger
 from app.utils.metrics import metrics_collector
+from app.utils.rate_limit import rate_limit_per_ip_per_minute
 from app.utils.request_context import clear_client_ip, clear_request_id, set_client_ip, set_request_id
-
-
-# 简单的内存限流器
-class RateLimiter:
-    """简单的内存限流器"""
-
-    def __init__(self):
-        self._requests: dict[str, list[float]] = defaultdict(list)
-
-    def is_allowed(self, client_ip: str, limit: int = 60, window: int = 60) -> bool:
-        """检查是否允许请求"""
-        now = time.time()
-        window_start = now - window
-
-        # 清理过期的记录
-        self._requests[client_ip] = [req_time for req_time in self._requests[client_ip] if req_time > window_start]
-
-        # 检查是否超出限制
-        if len(self._requests[client_ip]) >= limit:
-            return False
-
-        # 记录本次请求
-        self._requests[client_ip].append(now)
-        return True
-
-
-# 全局限流器实例
-rate_limiter = RateLimiter()
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -59,11 +31,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """处理限流逻辑"""
-        client_ip = request.client.host if request.client else "unknown"
-
-        if not rate_limiter.is_allowed(client_ip, settings.RATE_LIMIT_PER_MINUTE):
-            logger.warning(f"Rate limit exceeded for IP: {client_ip}")
-            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="请求过于频繁，请稍后再试")
+        limiter = rate_limit_per_ip_per_minute()
+        # 作为依赖执行
+        await limiter(request)
 
         return await call_next(request)
 
