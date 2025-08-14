@@ -10,10 +10,10 @@
 from typing import Any
 
 from fastapi import FastAPI, Request, status
-from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response
 from tortoise.exceptions import DoesNotExist, IntegrityError
 
