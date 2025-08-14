@@ -10,7 +10,7 @@
 from typing import Any
 
 from fastapi import FastAPI, Request, status
-from fastapi import HTTPException as FastAPIHTTPException
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
@@ -463,7 +463,7 @@ def setup_exception_handlers(app: FastAPI) -> None:
 
     """
     app.add_exception_handler(APIError, api_exception_handler)  # type: ignore[arg-type]
-    app.add_exception_handler(FastAPIHTTPException, http_exception_handler)  # 统一HTTPException返回结构
+    app.add_exception_handler(StarletteHTTPException, http_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(RequestValidationError, validation_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(ValidationError, validation_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(DoesNotExist, tortoise_not_found_exception_handler)  # type: ignore[arg-type]
@@ -471,7 +471,7 @@ def setup_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(Exception, generic_exception_handler)  # type: ignore[arg-type]
 
 
-async def http_exception_handler(_request: Request, exc: FastAPIHTTPException) -> Response:
+async def http_exception_handler(_request: Request, exc: StarletteHTTPException) -> Response:
     """统一 FastAPI HTTPException 的返回结构为 BaseResponse 风格。
 
     保留原始状态码；401 时保留认证头（如 WWW-Authenticate）。

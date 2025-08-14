@@ -7,9 +7,20 @@
 - **Content-Type**: `application/json; charset=utf-8`
 
 ### 统一响应
-- **BaseResponse[T]**: `{ data: T, message?: string }`
-- **SuccessResponse**: `{ message: string }`
-- **PaginatedResponse[T]**: `{ data: T[], total: number, page: number, page_size: number }`
+- **BaseResponse[T]**: `{ code: number, message: string, data: T | null, timestamp: string }`
+- **SuccessResponse**: `{ code: 200, message: string, data: {}, timestamp: string }`
+- **PaginatedResponse[T]**: `{ code: 200, message: string, data: T[], total: number, page: number, page_size: number, timestamp: string }`
+- **ErrorResponse**: `{ code: number, message: string, detail?: any }`
+
+未认证/未授权等错误也统一为上述 ErrorResponse 结构，例如：
+
+```json
+{
+  "code": 401,
+  "message": "Not authenticated",
+  "detail": null
+}
+```
 
 ### 速率限制（后端统一 Redis）
 - 登录: 3 次/10 秒
@@ -138,6 +149,10 @@
 - GET `/roles/{role_id}/users` 权限: `user:read` → `BaseResponse<UserResponse[]>`
 - GET `/permissions/{permission_id}/users` 权限: `user:read` → `BaseResponse<UserResponse[]>`
 - GET `/users/{user_id}/summary` 权限: `user:read` → `BaseResponse<UserRolePermissionSummary>`
+
+### 角色-用户批量
+- POST `/roles/{role_id}/users/assign` 权限: `user:assign_roles` → `BaseResponse<dict>`
+- DELETE `/roles/{role_id}/users/remove` 权限: `user:assign_roles` → `BaseResponse<dict>`
 
 ## 备注
 - 未暴露模块：`admin_dashboard`（后台管理仪表板）、`admin_routes`（管理员专用）。
