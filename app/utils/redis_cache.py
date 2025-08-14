@@ -16,6 +16,7 @@ except ImportError:
 
 from app.core.config import settings
 from app.utils.logger import logger
+from app.utils.metrics import metrics_collector
 
 
 class RedisCache:
@@ -44,10 +45,12 @@ class RedisCache:
                 await self._redis_client.ping()
                 self._is_connected = True
                 logger.info("Redis连接成功")
+                metrics_collector.set_redis_up(True)
             except Exception as e:
                 logger.error(f"Redis连接失败: {e}")
                 self._redis_client = None
                 self._is_connected = False
+                metrics_collector.set_redis_up(False)
 
         return self._redis_client
 
@@ -83,6 +86,7 @@ class RedisCache:
 
         except Exception as e:
             logger.error(f"Redis设置缓存失败: {key}, 错误: {e}")
+            metrics_collector.set_redis_up(False)
             return False
 
     async def set_plain(self, key: str, value: bytes | str, ttl: int) -> bool:
@@ -108,6 +112,7 @@ class RedisCache:
             return bool(result)
         except Exception as e:
             logger.error(f"Redis set_plain 失败: {key}, 错误: {e}")
+            metrics_collector.set_redis_up(False)
             return False
 
     async def get(self, key: str) -> Any | None:
@@ -141,6 +146,7 @@ class RedisCache:
 
         except Exception as e:
             logger.error(f"Redis获取缓存失败: {key}, 错误: {e}")
+            metrics_collector.set_redis_up(False)
             return None
 
     async def delete(self, key: str) -> bool:
@@ -163,6 +169,7 @@ class RedisCache:
 
         except Exception as e:
             logger.error(f"Redis删除缓存失败: {key}, 错误: {e}")
+            metrics_collector.set_redis_up(False)
             return False
 
     async def delete_pattern(self, pattern: str) -> int:
@@ -191,6 +198,7 @@ class RedisCache:
 
         except Exception as e:
             logger.error(f"Redis批量删除缓存失败: {pattern}, 错误: {e}")
+            metrics_collector.set_redis_up(False)
             return 0
 
     async def exists(self, key: str) -> bool:
@@ -212,6 +220,7 @@ class RedisCache:
 
         except Exception as e:
             logger.error(f"Redis检查缓存存在性失败: {key}, 错误: {e}")
+            metrics_collector.set_redis_up(False)
             return False
 
     async def ttl(self, key: str) -> int:
@@ -233,6 +242,7 @@ class RedisCache:
 
         except Exception as e:
             logger.error(f"Redis获取TTL失败: {key}, 错误: {e}")
+            metrics_collector.set_redis_up(False)
             return -2
 
     async def clear_all(self) -> bool:
@@ -259,6 +269,7 @@ class RedisCache:
 
         except Exception as e:
             logger.error(f"Redis清除所有缓存失败: {e}")
+            metrics_collector.set_redis_up(False)
             return False
 
     async def close(self):
@@ -267,6 +278,7 @@ class RedisCache:
             await self._redis_client.close()
             self._is_connected = False
             logger.info("Redis连接已关闭")
+            metrics_collector.set_redis_up(False)
 
 
 # 全局Redis缓存实例

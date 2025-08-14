@@ -107,7 +107,7 @@ class Settings(BaseSettings):
     JWT_ISSUER: str = Field(default="fastapi-admin")
     JWT_AUDIENCE: str = Field(default="fastapi-admin-clients")
     JWT_CLOCK_SKEW_SECONDS: int = Field(default=10)
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     ALGORITHM: str = Field(default="HS256")
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     ENABLE_2FA: bool = Field(default=False)

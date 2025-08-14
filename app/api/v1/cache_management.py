@@ -16,6 +16,7 @@ from app.core.permissions.simple_decorators import Permissions, require_permissi
 from app.schemas.base import BaseResponse
 from app.services.cache_service import CacheScenario, cache_manager
 from app.utils.deps import OperationContext
+from app.utils.metrics import metrics_collector
 
 router = APIRouter(prefix="/cache", tags=["缓存管理"])
 
@@ -30,7 +31,16 @@ async def get_cache_performance_stats(
         BaseResponse[dict[str, Any]]: 缓存性能统计数据
     """
     stats = await cache_manager.get_cache_performance_stats()
+    stats["dependencies"] = {"redis_up": int(metrics_collector._redis_up)}  # 简易附加状态
     return BaseResponse(data=stats, message="获取缓存性能统计成功")
+
+
+@router.get("/health", summary="缓存健康检查")
+async def cache_health(
+    operation_context: OperationContext = Depends(require_permission(Permissions.SYSTEM_ADMIN)),
+) -> BaseResponse[dict[str, Any]]:
+    """返回缓存健康状态（Redis 可用与否）。"""
+    return BaseResponse(data={"redis_up": int(metrics_collector._redis_up)}, message="OK")
 
 
 @router.get("/scenarios", summary="获取缓存场景配置")

@@ -11,10 +11,11 @@ from contextlib import asynccontextmanager
 
 import redis.asyncio as redis
 from fastapi import FastAPI
-from tortoise import Tortoise
 
 from app.core.config import settings
+from app.db.connection import close_database, init_database
 from app.utils.logger import logger
+from app.utils.metrics import metrics_collector
 from app.utils.permission_cache_utils import clear_all_permission_cache
 
 
@@ -74,24 +75,13 @@ async def shutdown(app: FastAPI) -> None:
 
 
 async def init_db() -> None:
-    """初始化数据库连接"""
-    try:
-        logger.info("正在初始化数据库连接...")
-        await Tortoise.init(config=settings.TORTOISE_ORM_CONFIG)
-        logger.info("数据库连接初始化完成")
-    except Exception as e:
-        logger.error(f"数据库连接初始化失败: {e}")
-        raise
+    """初始化数据库连接（委托到 app.db.connection）。"""
+    await init_database()
 
 
 async def close_db() -> None:
-    """关闭数据库连接"""
-    try:
-        logger.info("正在关闭数据库连接...")
-        await Tortoise.close_connections()
-        logger.info("数据库连接已关闭")
-    except Exception as e:
-        logger.error(f"关闭数据库连接时出错: {e}")
+    """关闭数据库连接（委托到 app.db.connection）。"""
+    await close_database()
 
 
 # Redis 连接管理
@@ -110,9 +100,11 @@ async def init_redis(app: FastAPI) -> None:
         # 测试连接
         await app.state.redis.ping()
         logger.info("Redis连接初始化完成并通过ping测试")
+        metrics_collector.set_redis_up(True)
     except Exception as e:
         logger.error(f"Redis连接初始化失败: {e}")
         app.state.redis = None  # 明确设置redis状态为None
+        metrics_collector.set_redis_up(False)
 
 
 async def close_redis(app: FastAPI) -> None:
@@ -122,6 +114,7 @@ async def close_redis(app: FastAPI) -> None:
         try:
             await app.state.redis.close()  # 关闭连接
             logger.info("Redis连接已关闭")
+            metrics_collector.set_redis_up(False)
         except Exception as e:
             logger.error(f"关闭Redis连接时出错: {e}")
     else:

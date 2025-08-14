@@ -36,6 +36,9 @@ class MetricsCollector:
         )
         self.prom_errors_total = Counter("http_errors_total", "HTTP错误总数", ["method", "path", "status"])
         self.prom_active_connections = Gauge("active_connections", "活跃连接数")
+        # 外部依赖健康度
+        self.prom_redis_up = Gauge("redis_up", "Redis 可用状态 (1=可用, 0=不可用)")
+        self._redis_up: bool = False
 
     def record_request(self, method: str, path: str, status_code: int, duration: float) -> None:
         """记录请求指标"""
@@ -82,6 +85,9 @@ class MetricsCollector:
             "active_connections": self._active_connections,
             "error_rate": self._total_errors / max(self._total_requests, 1),
             "endpoints": {},
+            "dependencies": {
+                "redis_up": int(self._redis_up),
+            },
         }
 
         # 计算每个端点的指标
@@ -120,6 +126,13 @@ class MetricsCollector:
         self._error_count.clear()
         self._total_requests = 0
         self._total_errors = 0
+
+    # ===== 外部依赖状态 =====
+    def set_redis_up(self, up: bool) -> None:
+        """设置 Redis 可用状态指标"""
+        self._redis_up = bool(up)
+        # Prometheus
+        self.prom_redis_up.set(1 if up else 0)
 
 
 # 全局指标收集器实例
