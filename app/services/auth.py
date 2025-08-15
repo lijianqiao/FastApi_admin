@@ -35,6 +35,7 @@ class AuthService:
 
     def __init__(self):
         self.user_service = None
+        self.user_dao = None
 
     def _get_user_service(self):
         """延迟导入UserService以避免循环导入"""
@@ -44,12 +45,23 @@ class AuthService:
             self.user_service = UserService()
         return self.user_service
 
+    def _get_user_dao(self):
+        """延迟导入UserDAO以避免循环导入"""
+        if self.user_dao is None:
+            from app.dao.user import UserDAO
+
+            self.user_dao = UserDAO()
+        return self.user_dao
+
     async def login(self, request: LoginRequest, client_ip: str, user_agent: str) -> TokenResponse:
         """用户登录"""
         user = await self._get_user_service().authenticate(request.username, request.password)
 
         if not user:
             raise UnauthorizedException("用户名或密码错误")
+
+        # 更新最后登录时间
+        await self._get_user_dao().update_last_login(user.id)
 
         # 创建令牌
         expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
