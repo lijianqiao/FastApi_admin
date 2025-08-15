@@ -209,6 +209,9 @@ class Settings(BaseSettings):
     ENABLE_TRUSTED_HOST: bool = Field(default=False)
     RATE_LIMIT_PER_MINUTE: int = Field(default=60)
 
+    # 会话中间件（JWT 项目默认关闭）
+    ENABLE_SESSION_MIDDLEWARE: bool = Field(default=False)
+
     # 监控配置
     ENABLE_METRICS: bool = Field(default=True)
     METRICS_PATH: str = Field(default="/metrics")

@@ -13,7 +13,7 @@ from app.api.v1 import (
     # admin_routes,  # 非核心RBAC接口，暂不暴露
     auth,
     operation_logs,
-    permission_cache,
+    # permission_cache,  # 权限缓存管理默认不挂载，可选
     permissions,
     roles,
     user_relations,
@@ -32,7 +32,8 @@ api_router.include_router(operation_logs.router, tags=["操作日志管理"])
 api_router.include_router(user_relations.router, tags=["用户关系管理"])
 # api_router.include_router(admin_dashboard.router, tags=["后台管理仪表板"])  # 暂不暴露
 # api_router.include_router(admin_routes.admin_router, tags=["管理员专用"])  # 暂不暴露
-api_router.include_router(permission_cache.router, tags=["权限缓存管理"])
+# 可选：权限缓存管理（超出脚手架最小集，默认不挂载）
+# api_router.include_router(permission_cache.router, tags=["权限缓存管理"])
 
 # 保持向后兼容
 v1_router = api_router

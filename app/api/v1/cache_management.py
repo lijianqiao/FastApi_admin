@@ -18,7 +18,8 @@ from app.services.cache_service import CacheScenario, cache_manager
 from app.utils.deps import OperationContext
 from app.utils.metrics import metrics_collector
 
-router = APIRouter(prefix="/cache", tags=["缓存管理"])
+# 可选模块：默认不挂载到主路由，需在应用入口显式 include_router 才生效
+router = APIRouter(prefix="/cache", tags=["缓存管理（可选）"])
 
 
 @router.get("/performance-stats", summary="获取缓存性能统计")

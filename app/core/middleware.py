@@ -97,8 +97,9 @@ def setup_middlewares(app: FastAPI) -> None:
     if settings.ENABLE_GZIP:
         app.add_middleware(GZipMiddleware, minimum_size=settings.GZIP_MINIMUM_SIZE)
 
-    # Session 中间件，用于管理用户会话
-    app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
+    # Session 中间件（JWT 场景默认关闭，可按需开启）
+    if settings.ENABLE_SESSION_MIDDLEWARE:
+        app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 
     # 请求日志中间件
     if settings.ENABLE_REQUEST_TRACKING:
