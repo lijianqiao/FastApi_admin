@@ -19,7 +19,7 @@ from app.utils.logger import logger
 from app.utils.request_context import get_request_id
 
 
-class OperationContext:
+class LogOperationContext:
     """简化的操作上下文"""
 
     def __init__(self, operation_type: str, operation_name: str):
@@ -78,7 +78,7 @@ class OperationContext:
 # 简化版本：移除复杂的队列处理，直接使用异步记录
 
 
-def _extract_basic_info(context: OperationContext, args: tuple, kwargs: dict):
+def _extract_basic_info(context: LogOperationContext, args: tuple, kwargs: dict):
     """提取基本信息：用户信息和资源ID"""
     # 提取用户信息 - 支持多种参数名称
     current_user = kwargs.get("current_user")
@@ -112,7 +112,7 @@ def _extract_basic_info(context: OperationContext, args: tuple, kwargs: dict):
                 break
 
 
-def _extract_request_info(context: OperationContext, args: tuple, kwargs: dict):
+def _extract_request_info(context: LogOperationContext, args: tuple, kwargs: dict):
     """提取请求信息：IP地址"""
     # 从kwargs中查找Request对象
     request = kwargs.get("request") or kwargs.get("req")
@@ -142,7 +142,7 @@ def _extract_request_info(context: OperationContext, args: tuple, kwargs: dict):
             pass
 
 
-async def _log_to_database(context: OperationContext):
+async def _log_to_database(context: LogOperationContext):
     """异步记录到数据库"""
     try:
         operation_log_dao = OperationLogDAO()
@@ -179,7 +179,7 @@ def _get_http_method(operation_type: str) -> str:
     return mapping.get(operation_type, "POST")
 
 
-def _build_description(context: OperationContext) -> str:
+def _build_description(context: LogOperationContext) -> str:
     """构建操作描述"""
     parts = []
     if context.username:
@@ -211,7 +211,7 @@ def operation_log(operation_type: str, operation_name: str, resource_type: str |
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             # 创建操作上下文
-            context = OperationContext(operation_type, operation_name)
+            context = LogOperationContext(operation_type, operation_name)
             context.resource_type = resource_type or _extract_resource_type(func)
 
             # 提取基本信息
@@ -258,7 +258,7 @@ def operation_log_with_context(operation_type: str, operation_name: str, resourc
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             # 创建操作上下文
-            context = OperationContext(operation_type, operation_name)
+            context = LogOperationContext(operation_type, operation_name)
             context.resource_type = resource_type or _extract_resource_type(func)
 
             # 优先从依赖注入中获取OperationContext
@@ -341,7 +341,7 @@ def _extract_ip_from_request(request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def _extract_resource_id_from_params(context: OperationContext, args: tuple, kwargs: dict):
+def _extract_resource_id_from_params(context: LogOperationContext, args: tuple, kwargs: dict):
     """从参数中提取资源ID"""
     # 提取资源ID
     for key in ["id", "user_id", "role_id", "menu_id", "permission_id"]:

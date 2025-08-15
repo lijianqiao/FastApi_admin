@@ -18,12 +18,11 @@
   - `app/utils/operation_logger.py` 中自定义类
   建议统一为依赖注入版本，日志模块内部复用以避免概念混淆。
 - 重复/近似方法：`app/dao/user.py` 中同时存在 `get_user_ids_by_role_id` 与 `get_user_ids_by_role`，且实现风格不一致（flat 与非 flat），建议保留一个语义清晰的方法并修正返回值类型。
-- 权限文档与实现不一致：`app/core/permissions/README.md` 提到的 `cache_with_ttl`、权限清理等接口在代码中并未实现；建议删除或改为“规划中”。
+- 权限文档与实现不一致：`app/core/permissions/README.md` 提到的 `cache_with_ttl`、权限清理等接口在代码中并未实现；建议删除。
 
 ### 过度设计/超出脚手架范围（建议默认关闭或移除）
 - 动态缓存场景与缓存管理 API：`app/services/cache_service.py`、`app/api/v1/cache_management.py` 提供了动态 TTL、批量 TTL 调整、场景化策略与运维接口，超出 RBAC 脚手架最小集。建议以“可选模块”形式提供并默认不挂载路由。
-- 日志归档压缩与恢复：`app/utils/log_compression.py` 与生命周期后台任务（`app/core/events.py`）对脚手架而言偏重，建议默认关闭或文档化为可选能力。
-- 权限自动发现：`app/core/permissions/discovery.py` 未与系统主流程集成，当前为游离功能。建议移至 examples 或在文档中标注“可选扩展”。
+- 权限自动发现：`app/core/permissions/discovery.py` 未与系统主流程集成，当前为游离功能。建议删除该文件。
 - 后台仪表板与导出：`app/api/v1/admin_dashboard.py`、`admin_routes.py` 当前虽未挂载，但接口较多，建议保留代码但默认不注册路由。
 
 ### 潜在问题与改进建议（按影响度）

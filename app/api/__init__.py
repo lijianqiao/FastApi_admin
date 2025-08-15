@@ -6,15 +6,12 @@
 @Docs: API路由初始化
 """
 
-import time
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
 from app.api.v1 import v1_router
 from app.core.config import settings
-from app.models.user import User
-from app.utils.deps import get_current_active_user
 
 # 创建主路由
 api_router = APIRouter()
@@ -36,25 +33,3 @@ async def health_check():
         "environment": settings.ENVIRONMENT,
         "timestamp": datetime.now(),
     }
-
-
-# 监控指标路由
-@api_router.get("/metrics", tags=["监控"])
-async def get_metrics(_: User = Depends(get_current_active_user)):
-    """获取应用监控指标"""
-    if not settings.ENABLE_METRICS:
-        return {"error": "监控功能未启用"}
-
-    try:
-        from app.utils.metrics import get_system_metrics, metrics_collector
-
-        app_metrics = metrics_collector.get_metrics()
-        system_metrics = get_system_metrics()
-
-        return {
-            "timestamp": time.time(),
-            "application": app_metrics,
-            "system": system_metrics,
-        }
-    except ImportError:
-        return {"error": "监控模块未安装"}
