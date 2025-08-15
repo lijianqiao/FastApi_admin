@@ -35,6 +35,7 @@ class OperationContext:
         self.status = "pending"
         self.error_message: str | None = None
         self.ip_address: str | None = None
+        self.request_path: str | None = None
 
     def set_success(self):
         """设置操作成功"""
@@ -134,6 +135,11 @@ def _extract_request_info(context: OperationContext, args: tuple, kwargs: dict):
                 context.ip_address = real_ip
             else:
                 context.ip_address = request.client.host if request.client else "unknown"
+        # 记录请求路径
+        try:
+            context.request_path = request.url.path
+        except Exception:
+            pass
 
 
 async def _log_to_database(context: OperationContext):
@@ -149,7 +155,7 @@ async def _log_to_database(context: OperationContext):
             "resource_id": context.resource_id,
             "resource_type": context.resource_type,
             "method": _get_http_method(context.operation_type),
-            "path": f"/api/{context.resource_type or 'unknown'}",
+            "path": context.request_path or f"/api/{context.resource_type or 'unknown'}",
             "ip_address": context.ip_address or "unknown",
             "response_code": 200 if context.status == "success" else 500,
             "response_time": int(context.get_duration_ms()),
@@ -256,18 +262,16 @@ def operation_log_with_context(operation_type: str, operation_name: str, resourc
             context.resource_type = resource_type or _extract_resource_type(func)
 
             # 优先从依赖注入中获取OperationContext
-            operation_context = kwargs.get("operation_context")
-            if not operation_context:
-                # 从位置参数中查找包含 user 和 request 属性的 OperationContext
-                for arg in args:
-                    if hasattr(arg, "user") and hasattr(arg, "request"):
-                        operation_context = arg
-                        break
+            operation_context = _find_operation_context(args, kwargs)
             if operation_context:
                 # 从依赖注入的上下文中提取信息
                 context.user_id = str(operation_context.user.id)
                 context.username = operation_context.user.username
                 context.ip_address = _extract_ip_from_request(operation_context.request)
+                try:
+                    context.request_path = operation_context.request.url.path if operation_context.request else None
+                except Exception:
+                    pass
                 # 注意：不要移除operation_context，业务方法需要这个参数
             else:
                 # 降级到原有的提取方式
@@ -305,6 +309,23 @@ def operation_log_with_context(operation_type: str, operation_name: str, resourc
         return wrapper
 
     return decorator
+
+
+def _find_operation_context(args: tuple, kwargs: dict):
+    """在参数中查找 FastAPI 注入的 OperationContext（不依赖参数名）。"""
+    # 1) 明确参数名优先（兼容 operation_context 与 _operation_context 等命名）
+    for key in ("operation_context", "_operation_context"):
+        if key in kwargs and hasattr(kwargs[key], "user") and hasattr(kwargs[key], "request"):
+            return kwargs[key]
+    # 2) 扫描 kwargs 值
+    for val in kwargs.values():
+        if hasattr(val, "user") and hasattr(val, "request"):
+            return val
+    # 3) 扫描位置参数
+    for arg in args:
+        if hasattr(arg, "user") and hasattr(arg, "request"):
+            return arg
+    return None
 
 
 def _extract_ip_from_request(request) -> str:
