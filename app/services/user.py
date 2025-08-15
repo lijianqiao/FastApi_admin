@@ -526,6 +526,24 @@ class UserService(BaseService[User]):
         users = await self.dao.get_all(roles__id=role_id, include_deleted=False)
         return [UserResponse.model_validate(user) for user in users]
 
+    async def get_users_by_permission_id(
+        self, permission_id: UUID, _operation_context: OperationContext
+    ) -> list[UserResponse]:
+        """根据权限ID获取拥有该权限（直接或经角色继承）的用户列表。
+
+        Args:
+            permission_id: 权限ID
+            _operation_context: 操作上下文
+
+        Returns:
+            list[UserResponse]
+        """
+        user_ids = await self.dao.get_user_ids_by_permission_deep(permission_id)
+        if not user_ids:
+            return []
+        users = await self.dao.get_by_ids(user_ids)
+        return [UserResponse.model_validate(u) for u in users]
+
     async def _get_user_permissions(self, user: User) -> set[Permission]:
         """获取用户的所有权限, 包括直接权限和通过角色继承的权限.
 

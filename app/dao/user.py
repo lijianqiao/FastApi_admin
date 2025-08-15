@@ -334,9 +334,9 @@ class UserDAO(BaseDAO[User]):
             list[UUID]: 用户ID列表
         """
         try:
-            # This is a more ORM-friendly way than raw SQL
-            users = await self.model.filter(roles__id=role_id).values_list("id", flat=True)
-            return [user_id for (user_id,) in users]
+            # 直接返回 flat=True 的列表
+            user_ids: list[UUID] = await self.model.filter(roles__id=role_id).values_list("id", flat=True)
+            return user_ids
         except Exception as e:
             logger.error(f"根据角色ID获取用户ID列表失败: {e}")
             return []

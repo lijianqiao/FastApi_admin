@@ -11,10 +11,10 @@ from datetime import datetime
 from typing import Any, TypeVar
 from uuid import UUID
 
+from tortoise.connection import connections
 from tortoise.exceptions import DoesNotExist, IntegrityError
 from tortoise.queryset import QuerySet
 from tortoise.transactions import in_transaction
-from tortoise.connection import connections
 
 from app.core.exceptions import (
     DatabaseConnectionException,
@@ -293,28 +293,24 @@ class BaseDAO[T: BaseModel]:
             if not objects_data:
                 return []
 
-            all_created = []
+            all_created: list[T] = []
             total_batches = (len(objects_data) + batch_size - 1) // batch_size
 
             async with in_transaction():
-                batch_data = []
-                batch_num: int | None = None
                 for i in range(0, len(objects_data), batch_size):
                     batch_data = objects_data[i : i + batch_size]
                     batch_num = i // batch_size + 1
-
-                try:
-                    objects = [self.model(**data) for data in batch_data]
-                    result = await self.model.bulk_create(objects)
-                    if result:
-                        all_created.extend(result)
-
-                    logger.debug(
-                        f"批量创建进度: {batch_num}/{total_batches}, 本批次: {len(result or [])}/{len(batch_data)}"
-                    )
-
-                except Exception as batch_error:
-                    logger.error(f"批次 {batch_num} 创建失败: {batch_error}")
+                    try:
+                        objects = [self.model(**data) for data in batch_data]
+                        result = await self.model.bulk_create(objects)
+                        if result:
+                            all_created.extend(result)
+                        logger.debug(
+                            f"批量创建进度: {batch_num}/{total_batches}, 本批次: {len(result or [])}/{len(batch_data)}"
+                        )
+                    except Exception as batch_error:
+                        logger.error(f"批次 {batch_num} 创建失败: {batch_error}")
+                        # 不中断整体流程，继续处理后续批次
 
             logger.info(f"分批次批量创建完成: {len(all_created)}/{len(objects_data)} 条")
             return all_created

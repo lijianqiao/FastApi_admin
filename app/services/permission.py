@@ -216,10 +216,14 @@ class PermissionService(BaseService[Permission]):
                 role_count = 0
 
             try:
-                user_count = await user_dao.model.filter(
-                    Q(permissions__id=perm.id) | Q(roles__permissions__id=perm.id),
-                    is_deleted=False,
-                ).distinct().count()
+                user_count = (
+                    await user_dao.model.filter(
+                        Q(permissions__id=perm.id) | Q(roles__permissions__id=perm.id),
+                        is_deleted=False,
+                    )
+                    .distinct()
+                    .count()
+                )
             except Exception:
                 user_count = 0
 
@@ -272,16 +276,21 @@ class PermissionService(BaseService[Permission]):
             raise BusinessException(msg)
         # 统计
         from tortoise.expressions import Q
+
         user_dao = UserDAO()
         try:
             role_count = await self.role_dao.count(permissions__id=permission.id, is_deleted=False)
         except Exception:
             role_count = 0
         try:
-            user_count = await user_dao.model.filter(
-                Q(permissions__id=permission.id) | Q(roles__permissions__id=permission.id),
-                is_deleted=False,
-            ).distinct().count()
+            user_count = (
+                await user_dao.model.filter(
+                    Q(permissions__id=permission.id) | Q(roles__permissions__id=permission.id),
+                    is_deleted=False,
+                )
+                .distinct()
+                .count()
+            )
         except Exception:
             user_count = 0
 
@@ -309,4 +318,13 @@ class PermissionService(BaseService[Permission]):
             operation_context: 操作上下文
 
         """
-        await self.update(permission_id, is_active=is_active, operation_context=operation_context)
+        # 读取当前版本并带版本更新，避免触发基础层 version 校验错误
+        current = await self.dao.get_by_id(permission_id)
+        if not current:
+            raise BusinessException("权限未找到")
+        await self.update(
+            permission_id,
+            is_active=is_active,
+            version=current.version,
+            operation_context=operation_context,
+        )

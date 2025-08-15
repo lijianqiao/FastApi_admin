@@ -102,7 +102,7 @@ async def get_users_by_permission(
     operation_context: OperationContext = Depends(require_permission(Permissions.USER_READ)),
 ):
     """获取拥有指定权限的所有用户（直接权限或通过角色继承）"""
-    users = await user_service.get_user_permissions(permission_id, operation_context)
+    users = await user_service.get_users_by_permission_id(permission_id, operation_context)
     return BaseResponse(data=users)
 
 
